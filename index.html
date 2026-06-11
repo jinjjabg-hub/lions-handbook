@@ -77,9 +77,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 .exec-mini-name{font-size:15px;font-weight:700;color:var(--ink)}
 
 /* 헌장 */
-.tab-row{display:flex;border-bottom:2px solid var(--line);background:var(--card);flex-shrink:0;overflow-x:auto}
+.tab-row{display:flex;border-bottom:2px solid var(--line);background:var(--card);flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tab-row::-webkit-scrollbar{display:none}
-.reg-tab{padding:12px 16px;font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px}
+.reg-tab{padding:10px 12px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;flex-shrink:0}
 .reg-tab.active{color:var(--navy);border-bottom-color:var(--navy)}
 .reg-content{padding:16px 20px;line-height:1.85;font-size:14px;color:var(--ink)}
 .reg-h1{font-size:18px;font-weight:800;color:var(--navy);margin:20px 0 8px;font-family:Georgia,serif}
@@ -879,7 +879,7 @@ function renderRules(el) {
     </div>
   </div>
   <input id="reg-search" class="search-box" placeholder="규정 내 검색..." oninput="searchReg(this.value)" autocomplete="off" style="margin-top:10px"/>
-  <div class="tab-row">
+  <div class="tab-row" id="reg-tabrow">
     ${tabs.map(t=>`<button class="reg-tab${t===currentRegTab?' active':''}" onclick="switchRegTab('${t}')" id="rtab-${t.replace(/[^a-zA-Z가-힣]/g,'_')}">${t}</button>`).join('')}
   </div>
   <div id="reg-body" class="scroll">${REGS[currentRegTab]}</div>`;
@@ -890,7 +890,10 @@ function switchRegTab(t) {
   document.querySelectorAll('.reg-tab').forEach(b => b.classList.remove('active'));
   const safe = t.replace(/[^a-zA-Z가-힣]/g,'_');
   const btn = document.getElementById('rtab-'+safe);
-  if (btn) btn.classList.add('active');
+  if (btn) {
+    btn.classList.add('active');
+    btn.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
+  }
   document.getElementById('reg-body').innerHTML = REGS[t];
   document.getElementById('reg-search').value = '';
 }
