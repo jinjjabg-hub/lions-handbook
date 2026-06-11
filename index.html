@@ -77,10 +77,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 .exec-mini-name{font-size:15px;font-weight:700;color:var(--ink)}
 
 /* 헌장 */
-.tab-row{display:flex;border-bottom:2px solid var(--line);background:var(--card);flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.tab-row::-webkit-scrollbar{display:none}
-.reg-tab{padding:10px 12px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;flex-shrink:0}
-.reg-tab.active{color:var(--navy);border-bottom-color:var(--navy)}
+.tab-row{display:flex;flex-wrap:wrap;border-bottom:2px solid var(--line);background:var(--card);flex-shrink:0}
+.reg-tab{width:20%;padding:9px 4px;font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;text-align:center;box-sizing:border-box}
+.reg-tab.active{color:var(--navy);border-bottom-color:var(--navy);background:rgba(26,58,107,.05)}
 .reg-content{padding:16px 20px;line-height:1.85;font-size:14px;color:var(--ink)}
 .reg-h1{font-size:18px;font-weight:800;color:var(--navy);margin:20px 0 8px;font-family:Georgia,serif}
 .reg-h2{font-size:15px;font-weight:700;color:var(--navy-d);margin:14px 0 6px}
@@ -890,10 +889,7 @@ function switchRegTab(t) {
   document.querySelectorAll('.reg-tab').forEach(b => b.classList.remove('active'));
   const safe = t.replace(/[^a-zA-Z가-힣]/g,'_');
   const btn = document.getElementById('rtab-'+safe);
-  if (btn) {
-    btn.classList.add('active');
-    btn.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
-  }
+  if (btn) btn.classList.add('active');
   document.getElementById('reg-body').innerHTML = REGS[t];
   document.getElementById('reg-search').value = '';
 }
