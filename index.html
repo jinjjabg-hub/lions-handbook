@@ -267,12 +267,16 @@ function showToast(msg) {
   toastTimer = setTimeout(() => el.style.display='none', 2200);
 }
 
-function avatar(name, gold=false, size=48) {
+function avatar(name, gold=false, size=48, id=null) {
   const ch = name ? name[0] : '?';
   const bg = gold ? 'linear-gradient(135deg,var(--gold),#d4a017)' : 'linear-gradient(135deg,#2a4d8f,#1a3060)';
   const color = gold ? 'var(--navy-d)' : '#fff';
   const fs = Math.round(size * 0.35);
-  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:${color};display:flex;align-items:center;justify-content:center;font-size:${fs}px;font-weight:800;flex-shrink:0">${ch}</div>`;
+  const fallback = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:${color};display:flex;align-items:center;justify-content:center;font-size:${fs}px;font-weight:800;flex-shrink:0">${ch}</div>`;
+  if (!id) return fallback;
+  return `<div style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;overflow:hidden;background:${bg}">
+    <img src="photos/${id}.jpg" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.innerHTML='<div style=\\'width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:${color};display:flex;align-items:center;justify-content:center;font-size:${fs}px;font-weight:800\\'>${ch}</div>';this.parentNode.style.background='none'"/>
+  </div>`;
 }
 
 // ===== 네비게이션 =====
@@ -331,7 +335,7 @@ function renderHome(el) {
     </div>
 
     <div onclick="showMember(1)" style="margin:0 16px 18px;border-radius:16px;background:var(--card);border:1px solid var(--line);padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer">
-      ${avatar('허',true,56)}
+      ${avatar('허',true,56,1)}
       <div style="flex:1;min-width:0">
         <div style="font-size:11px;color:var(--gold-d);font-weight:700">제65대 회장 · 회장지침</div>
         <div style="font-size:18px;font-weight:800;color:var(--navy);margin-top:3px;line-height:1.3;word-break:keep-all">${CLUB.presidentGuide}</div>
@@ -423,7 +427,7 @@ function renderMemberList(list) {
       </div>`;
     groups[k].forEach(m => {
       html += `<button onclick="showMember(${m.id})" style="width:100%;display:flex;align-items:center;padding:11px 14px;gap:12px;text-align:left;border:none;border-bottom:1px solid var(--line);background:none;cursor:pointer">
-        ${avatar(m.name, m.id===1, 46)}
+        ${avatar(m.name, m.id===1, 46, m.id)}
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:7px">
             <span style="font-size:17px;font-weight:700;color:var(--ink)">${m.name}</span>
@@ -481,7 +485,7 @@ function renderMemberCard(el, m) {
   </div>
   <div class="scroll" style="padding-bottom:30px">
     <div class="card-hero">
-      ${avatar(m.name, true, 68)}
+      ${avatar(m.name, true, 68, m.id)}
       <div style="flex:1;min-width:0">
         <div class="card-name">${m.name}</div>
         <div class="card-rom">${m.rom||''}</div>
@@ -570,7 +574,7 @@ function renderExec(el) {
 
 function execChief(id, role, name) {
   return `<div onclick="showMember(${id})" style="margin:0 16px 10px;border-radius:16px;background:var(--card);border:2px solid var(--navy);padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer">
-    ${avatar(name,true,52)}
+    ${avatar(name,true,52,id)}
     <div style="flex:1">
       <div style="font-size:12px;color:var(--gold-d);font-weight:700">${role}</div>
       <div style="font-size:20px;font-weight:800;color:var(--ink);margin-top:2px">${name}</div>
@@ -582,7 +586,7 @@ function execChief(id, role, name) {
 function execMini(id, role, name) {
   return `<div onclick="showMember(${id})" class="exec-mini" style="cursor:pointer">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      ${avatar(name,false,32)}
+      ${avatar(name,false,32,id)}
       <div>
         <div class="exec-mini-role">${role}</div>
         <div class="exec-mini-name">${name}</div>
