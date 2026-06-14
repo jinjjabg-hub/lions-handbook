@@ -1034,9 +1034,22 @@ function checkSession() {
   return false;
 }
 
+function parseBirth(bStr) {
+  // "1962.3.4" → "19620304"
+  if (!bStr) return '';
+  const parts = bStr.replace(/[^0-9.]/g,'').split('.');
+  if (parts.length === 3) {
+    const y = parts[0];
+    const m = parts[1].padStart(2,'0');
+    const d = parts[2].padStart(2,'0');
+    return y + m + d;
+  }
+  return bStr.replace(/\D/g,'').substring(0,8);
+}
+
 function doLogin(birth, phone4) {
   const member = MEMBERS_CLEAN.find(m => {
-    const b = (m.b||'').replace(/\D/g,'').substring(0,8);
+    const b = parseBirth(m.b);
     const p = (m.f||'').replace(/\D/g,'').slice(-4);
     return b === birth && p === phone4;
   });
