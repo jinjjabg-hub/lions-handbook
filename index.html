@@ -123,7 +123,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
     </div>
     <div style="width:100%;padding:0 28px 44px">
       <div style="font-size:14px;letter-spacing:7px;color:var(--gold-l);margin-bottom:24px;font-weight:500;text-align:center">WE&nbsp;&nbsp;SERVE</div>
-      <button class="btn-primary btn-gold" onclick="openApp()" style="font-size:18px">
+      <button class="btn-primary btn-gold" onclick="startApp()" style="font-size:18px">
         회원수첩 펼치기
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -252,6 +252,123 @@ const MEMBERS = [
 ];
 
 // 중복 제거
+// ===== 로그인 시스템 =====
+let currentUser = null;
+let isAdmin = false;
+
+// 관리자 생년월일 목록 (허광탁, 김근우, 박성민)
+const ADMIN_BIRTHS = ['19620304', '19730805', '19840226'];
+
+function checkSession() {
+  const saved = sessionStorage.getItem('lions_user');
+  if (saved) {
+    currentUser = JSON.parse(saved);
+    isAdmin = ADMIN_BIRTHS.includes(currentUser.birth);
+    return true;
+  }
+  return false;
+}
+
+function parseBirth(bStr) {
+  // "1962.3.4" → "19620304"
+  if (!bStr) return '';
+  const parts = bStr.replace(/[^0-9.]/g,'').split('.');
+  if (parts.length === 3) {
+    const y = parts[0];
+    const m = parts[1].padStart(2,'0');
+    const d = parts[2].padStart(2,'0');
+    return y + m + d;
+  }
+  return bStr.replace(/\D/g,'').substring(0,8);
+}
+
+function doLogin(birth, phone4) {
+  const member = MEMBERS_CLEAN.find(m => {
+    const b = parseBirth(m.b);
+    const p = (m.f||'').replace(/\D/g,'').slice(-4);
+    return b === birth && p === phone4;
+  });
+  if (member) {
+    currentUser = {birth, name: member.name, id: member.id};
+    isAdmin = ADMIN_BIRTHS.includes(birth);
+    sessionStorage.setItem('lions_user', JSON.stringify(currentUser));
+    return member;
+  }
+  return null;
+}
+
+function doLogout() {
+  currentUser = null; isAdmin = false;
+  sessionStorage.removeItem('lions_user');
+  document.getElementById('main').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showLoginScreen() {
+  const el = document.getElementById('login-screen');
+  el.style.display = 'block';
+  el.innerHTML = `
+  <div style="position:fixed;inset:0;background:radial-gradient(130% 90% at 50% 8%,#21477f,#0d1f3d);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;z-index:100">
+    <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#d4a017);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#142d52;margin-bottom:20px;box-shadow:0 0 0 8px rgba(240,192,64,.2)">L</div>
+    <div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:4px">부산라이온스클럽</div>
+    <div style="font-size:13px;color:rgba(247,230,173,.7);margin-bottom:36px;letter-spacing:2px">BUSAN LIONS CLUB</div>
+    
+    <div style="width:100%;max-width:320px;background:rgba(255,255,255,.08);border-radius:20px;padding:24px;backdrop-filter:blur(10px)">
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;color:rgba(247,230,173,.8);font-weight:600;display:block;margin-bottom:6px">생년월일 (8자리)</label>
+        <input id="login-id" type="tel" placeholder="예: 19620304" maxlength="8"
+          style="width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:16px;outline:none;letter-spacing:2px"
+          oninput="if(this.value.length===8)document.getElementById('login-pw').focus()"
+        />
+      </div>
+      <div style="margin-bottom:24px">
+        <label style="font-size:12px;color:rgba(247,230,173,.8);font-weight:600;display:block;margin-bottom:6px">전화번호 끝 4자리</label>
+        <input id="login-pw" type="tel" placeholder="예: 0669" maxlength="4"
+          style="width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:16px;outline:none;letter-spacing:4px"
+          onkeydown="if(event.key==='Enter')tryLogin()"
+        />
+      </div>
+      <button onclick="tryLogin()" style="width:100%;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#d4a017);color:#142d52;font-size:16px;font-weight:800;border:none;cursor:pointer">
+        회원수첩 열기
+      </button>
+      <div id="login-err" style="text-align:center;color:#ff8080;font-size:13px;margin-top:12px;display:none">
+        생년월일 또는 전화번호가 맞지 않습니다
+      </div>
+    </div>
+    <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.3);text-align:center">
+      로그인 정보는 사무장에게 문의하세요
+    </div>
+  </div>`;
+  el.style.display = 'block';
+}
+
+function tryLogin() {
+  const birth = document.getElementById('login-id').value.trim();
+  const pw = document.getElementById('login-pw').value.trim();
+  const err = document.getElementById('login-err');
+  
+  if (birth.length !== 8 || pw.length !== 4) {
+    err.style.display = 'block';
+    err.textContent = '생년월일 8자리와 전화번호 끝 4자리를 입력해주세요';
+    return;
+  }
+  
+  const member = doLogin(birth, pw);
+  if (member) {
+    const ls = document.getElementById('login-screen');
+    ls.style.display = 'none';
+    ls.innerHTML = '';
+    document.getElementById('cover').style.display = 'none';
+    const main = document.getElementById('main');
+    main.style.display = 'flex';
+    showTab('home');
+  } else {
+    err.style.display = 'block';
+    err.textContent = '생년월일 또는 전화번호가 맞지 않습니다';
+  }
+}
+
+
 const MEMBERS_CLEAN = MEMBERS.filter((m,i,a) => m.name && m.f && a.findIndex(x=>x.name===m.name)===i);
 
 const KA = ['가','나','다','라','마','바','사','아','자','차','카','타','파','하'];
@@ -290,14 +407,19 @@ function avatar(name, gold=false, size=48, id=null) {
 // ===== 네비게이션 =====
 let currentTab = 'home';
 
-function openApp() {
+
+function startApp() {
   document.getElementById('cover').style.display = 'none';
-  if (!currentUser && !checkSession()) {
+  if (checkSession()) {
+    document.getElementById('main').style.display = 'flex';
+    showTab('home');
+  } else {
     showLoginScreen();
-    return;
   }
+}
+function openApp() {
   const main = document.getElementById('main');
-  main.style.display = 'flex';
+  if (main) main.style.display = 'flex';
   showTab('home');
 }
 
@@ -1023,122 +1145,6 @@ function showYearDetail(idx) {
       ${h.officers.split(' · ').map(o=>`<div class="row"><div class="row-val">${o}</div></div>`).join('')}
     </div>
   </div>`;
-}
-
-// ===== 로그인 시스템 =====
-let currentUser = null;
-let isAdmin = false;
-
-// 관리자 생년월일 목록 (허광탁, 김근우, 박성민)
-const ADMIN_BIRTHS = ['19620304', '19730805', '19840226'];
-
-function checkSession() {
-  const saved = sessionStorage.getItem('lions_user');
-  if (saved) {
-    currentUser = JSON.parse(saved);
-    isAdmin = ADMIN_BIRTHS.includes(currentUser.birth);
-    return true;
-  }
-  return false;
-}
-
-function parseBirth(bStr) {
-  // "1962.3.4" → "19620304"
-  if (!bStr) return '';
-  const parts = bStr.replace(/[^0-9.]/g,'').split('.');
-  if (parts.length === 3) {
-    const y = parts[0];
-    const m = parts[1].padStart(2,'0');
-    const d = parts[2].padStart(2,'0');
-    return y + m + d;
-  }
-  return bStr.replace(/\D/g,'').substring(0,8);
-}
-
-function doLogin(birth, phone4) {
-  const member = MEMBERS_CLEAN.find(m => {
-    const b = parseBirth(m.b);
-    const p = (m.f||'').replace(/\D/g,'').slice(-4);
-    return b === birth && p === phone4;
-  });
-  if (member) {
-    currentUser = {birth, name: member.name, id: member.id};
-    isAdmin = ADMIN_BIRTHS.includes(birth);
-    sessionStorage.setItem('lions_user', JSON.stringify(currentUser));
-    return member;
-  }
-  return null;
-}
-
-function doLogout() {
-  currentUser = null; isAdmin = false;
-  sessionStorage.removeItem('lions_user');
-  document.getElementById('main').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-}
-
-function showLoginScreen() {
-  const el = document.getElementById('login-screen');
-  el.style.display = 'block';
-  el.innerHTML = `
-  <div style="position:fixed;inset:0;background:radial-gradient(130% 90% at 50% 8%,#21477f,#0d1f3d);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;z-index:100">
-    <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#d4a017);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#142d52;margin-bottom:20px;box-shadow:0 0 0 8px rgba(240,192,64,.2)">L</div>
-    <div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:4px">부산라이온스클럽</div>
-    <div style="font-size:13px;color:rgba(247,230,173,.7);margin-bottom:36px;letter-spacing:2px">BUSAN LIONS CLUB</div>
-    
-    <div style="width:100%;max-width:320px;background:rgba(255,255,255,.08);border-radius:20px;padding:24px;backdrop-filter:blur(10px)">
-      <div style="margin-bottom:16px">
-        <label style="font-size:12px;color:rgba(247,230,173,.8);font-weight:600;display:block;margin-bottom:6px">생년월일 (8자리)</label>
-        <input id="login-id" type="tel" placeholder="예: 19620304" maxlength="8"
-          style="width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:16px;outline:none;letter-spacing:2px"
-          oninput="if(this.value.length===8)document.getElementById('login-pw').focus()"
-        />
-      </div>
-      <div style="margin-bottom:24px">
-        <label style="font-size:12px;color:rgba(247,230,173,.8);font-weight:600;display:block;margin-bottom:6px">전화번호 끝 4자리</label>
-        <input id="login-pw" type="tel" placeholder="예: 0669" maxlength="4"
-          style="width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:16px;outline:none;letter-spacing:4px"
-          onkeydown="if(event.key==='Enter')tryLogin()"
-        />
-      </div>
-      <button onclick="tryLogin()" style="width:100%;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#d4a017);color:#142d52;font-size:16px;font-weight:800;border:none;cursor:pointer">
-        회원수첩 열기
-      </button>
-      <div id="login-err" style="text-align:center;color:#ff8080;font-size:13px;margin-top:12px;display:none">
-        생년월일 또는 전화번호가 맞지 않습니다
-      </div>
-    </div>
-    <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.3);text-align:center">
-      로그인 정보는 사무장에게 문의하세요
-    </div>
-  </div>`;
-  el.style.display = 'block';
-}
-
-function tryLogin() {
-  const birth = document.getElementById('login-id').value.trim();
-  const pw = document.getElementById('login-pw').value.trim();
-  const err = document.getElementById('login-err');
-  
-  if (birth.length !== 8 || pw.length !== 4) {
-    err.style.display = 'block';
-    err.textContent = '생년월일 8자리와 전화번호 끝 4자리를 입력해주세요';
-    return;
-  }
-  
-  const member = doLogin(birth, pw);
-  if (member) {
-    const ls = document.getElementById('login-screen');
-    ls.style.display = 'none';
-    ls.innerHTML = '';
-    document.getElementById('cover').style.display = 'none';
-    const main = document.getElementById('main');
-    main.style.display = 'flex';
-    showTab('home');
-  } else {
-    err.style.display = 'block';
-    err.textContent = '생년월일 또는 전화번호가 맞지 않습니다';
-  }
 }
 
 // ===== 공지사항 탭 =====
