@@ -98,6 +98,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 </style>
 </head>
 <body>
+<div id="login-screen" style="display:none"></div>
 <div id="app">
 
   <!-- 표지 -->
@@ -153,6 +154,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
       <button class="tab-btn" onclick="showTab('history')" id="tab-history">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         연혁
+      </button>
+      <button class="tab-btn" onclick="showTab('news')" id="tab-news">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        소식
+      </button>
+      <button class="tab-btn" onclick="showTab('gallery')" id="tab-gallery">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        갤러리
       </button>
     </div>
   </div>
@@ -283,6 +292,10 @@ let currentTab = 'home';
 
 function openApp() {
   document.getElementById('cover').style.display = 'none';
+  if (!currentUser && !checkSession()) {
+    showLoginScreen();
+    return;
+  }
   const main = document.getElementById('main');
   main.style.display = 'flex';
   showTab('home');
@@ -303,6 +316,8 @@ function showTab(tab) {
   else if (tab==='exec') renderExec(div);
   else if (tab==='rules') renderRules(div);
   else if (tab==='history') renderHistory(div);
+  else if (tab==='news') renderNews(div);
+  else if (tab==='gallery') renderGallery(div);
 }
 
 function showMember(id) {
@@ -318,12 +333,14 @@ function showMember(id) {
 
 // ===== 홈 =====
 function renderHome(el) {
+  const userName = currentUser ? currentUser.name : '';
   el.innerHTML = `
   <div class="appbar">
-    <div>
+    <div style="flex:1">
       <div class="appbar-title">부산라이온스클럽</div>
-      <div class="appbar-sub">제65대 · 2024 – 2025</div>
+      <div class="appbar-sub">제65대 · 2024 – 2025 ${userName?'· '+userName+' L':''}</div>
     </div>
+    <button onclick="doLogout()" style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:6px 10px;color:#fff;font-size:12px;cursor:pointer">로그아웃</button>
   </div>
   <div class="scroll" style="padding-bottom:24px">
     <div style="margin:16px;border-radius:18px;background:linear-gradient(135deg,#1c3e72,#0e2140);color:#fff;padding:20px">
@@ -999,6 +1016,218 @@ function showYearDetail(idx) {
     </div>
   </div>`;
 }
+
+// ===== 로그인 시스템 =====
+let currentUser = null;
+let isAdmin = false;
+
+// 관리자 생년월일 목록 (허광탁, 김근우, 박성민)
+const ADMIN_BIRTHS = ['19620304', '19730805', '19840226'];
+
+function checkSession() {
+  const saved = sessionStorage.getItem('lions_user');
+  if (saved) {
+    currentUser = JSON.parse(saved);
+    isAdmin = ADMIN_BIRTHS.includes(currentUser.birth);
+    return true;
+  }
+  return false;
+}
+
+function doLogin(birth, phone4) {
+  const member = MEMBERS_CLEAN.find(m => {
+    const b = (m.b||'').replace(/\D/g,'').substring(0,8);
+    const p = (m.f||'').replace(/\D/g,'').slice(-4);
+    return b === birth && p === phone4;
+  });
+  if (member) {
+    currentUser = {birth, name: member.name, id: member.id};
+    isAdmin = ADMIN_BIRTHS.includes(birth);
+    sessionStorage.setItem('lions_user', JSON.stringify(currentUser));
+    return member;
+  }
+  return null;
+}
+
+function doLogout() {
+  currentUser = null; isAdmin = false;
+  sessionStorage.removeItem('lions_user');
+  document.getElementById('main').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showLoginScreen() {
+  const el = document.getElementById('login-screen');
+  el.innerHTML = `
+  <div style="position:fixed;inset:0;background:radial-gradient(130% 90% at 50% 8%,#21477f,#0d1f3d);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;z-index:100">
+    <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#d4a017);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#142d52;margin-bottom:20px;box-shadow:0 0 0 8px rgba(240,192,64,.2)">L</div>
+    <div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:4px">부산라이온스클럽</div>
+    <div style="font-size:13px;color:rgba(247,230,173,.7);margin-bottom:36px;letter-spacing:2px">BUSAN LIONS CLUB</div>
+    
+    <div style="width:100%;max-width:320px;background:rgba(255,255,255,.08);border-radius:20px;padding:24px;backdrop-filter:blur(10px)">
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;color:rgba(247,230,173,.8);font-weight:600;display:block;margin-bottom:6px">생년월일 (8자리)</label>
+        <input id="login-id" type="tel" placeholder="예: 19620304" maxlength="8"
+          style="width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:16px;outline:none;letter-spacing:2px"
+          oninput="if(this.value.length===8)document.getElementById('login-pw').focus()"
+        />
+      </div>
+      <div style="margin-bottom:24px">
+        <label style="font-size:12px;color:rgba(247,230,173,.8);font-weight:600;display:block;margin-bottom:6px">전화번호 끝 4자리</label>
+        <input id="login-pw" type="tel" placeholder="예: 0669" maxlength="4"
+          style="width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:16px;outline:none;letter-spacing:4px"
+          onkeydown="if(event.key==='Enter')tryLogin()"
+        />
+      </div>
+      <button onclick="tryLogin()" style="width:100%;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#d4a017);color:#142d52;font-size:16px;font-weight:800;border:none;cursor:pointer">
+        회원수첩 열기
+      </button>
+      <div id="login-err" style="text-align:center;color:#ff8080;font-size:13px;margin-top:12px;display:none">
+        생년월일 또는 전화번호가 맞지 않습니다
+      </div>
+    </div>
+    <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.3);text-align:center">
+      로그인 정보는 사무장에게 문의하세요
+    </div>
+  </div>`;
+  el.style.display = 'block';
+}
+
+function tryLogin() {
+  const birth = document.getElementById('login-id').value.trim();
+  const pw = document.getElementById('login-pw').value.trim();
+  const err = document.getElementById('login-err');
+  
+  if (birth.length !== 8 || pw.length !== 4) {
+    err.style.display = 'block';
+    err.textContent = '생년월일 8자리와 전화번호 끝 4자리를 입력해주세요';
+    return;
+  }
+  
+  const member = doLogin(birth, pw);
+  if (member) {
+    document.getElementById('login-screen').style.display = 'none';
+    openApp();
+  } else {
+    err.style.display = 'block';
+    err.textContent = '생년월일 또는 전화번호가 맞지 않습니다';
+  }
+}
+
+// ===== 공지사항 탭 =====
+const NOTICES = [
+  {id:1, title:'2025년 6월 월례회 안내', date:'2025-06-10', content:'6월 월례회는 6월 18일(수) 오후 6시, 부산라이온스 빌딩 4층에서 개최됩니다.', author:'사무장'},
+  {id:2, title:'장학금 신청 안내', date:'2025-05-20', content:'2025년도 장학금 신청을 받습니다. 신청서는 사무국으로 제출해주세요.', author:'사무장'},
+  {id:3, title:'6월 봉사활동 안내', date:'2025-06-01', content:'6월 봉사활동은 6월 14일(토) 오전 10시, 부산 사회복지관에서 진행됩니다.', author:'회장'},
+];
+
+function renderNews(el) {
+  el.innerHTML = `
+  <div class="appbar">
+    <div><div class="appbar-title">소식 · 공지사항</div><div class="appbar-sub">부산라이온스클럽</div></div>
+    ${isAdmin?`<button onclick="showAddNotice()" style="background:var(--gold);border:none;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--navy-d);cursor:pointer">+ 등록</button>`:''}
+  </div>
+  <div class="scroll" style="padding-bottom:24px">
+    <div id="notice-list"></div>
+  </div>`;
+  
+  const list = el.querySelector('#notice-list');
+  if (NOTICES.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);margin-top:60px;font-size:15px">등록된 공지사항이 없습니다</div>';
+    return;
+  }
+  
+  list.innerHTML = NOTICES.map(n => `
+    <div onclick="showNoticeDetail(${n.id})" style="background:var(--card);border-bottom:1px solid var(--line);padding:16px 20px;cursor:pointer">
+      <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px">${n.title}</div>
+      <div style="display:flex;gap:12px;font-size:12px;color:var(--muted)">
+        <span>${n.date}</span>
+        <span>${n.author}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showNoticeDetail(id) {
+  const n = NOTICES.find(x=>x.id===id);
+  if(!n) return;
+  const screens = document.getElementById('screens');
+  const div = document.createElement('div');
+  div.className = 'screen';
+  div.style.cssText = 'position:absolute;inset:0;z-index:10;display:flex;flex-direction:column';
+  screens.appendChild(div);
+  div.innerHTML = `
+  <div class="appbar">
+    <button class="appbar-back" onclick="this.closest('.screen').remove()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 5l-7 7 7 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="appbar-title">공지사항</div>
+  </div>
+  <div class="scroll" style="padding:20px">
+    <div style="font-size:18px;font-weight:800;color:var(--ink);margin-bottom:10px">${n.title}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:20px">${n.date} · ${n.author}</div>
+    <div style="font-size:15px;color:var(--ink);line-height:1.8">${n.content}</div>
+  </div>`;
+}
+
+// ===== 갤러리 탭 =====
+const GALLERY = [
+  {id:1, title:'2025년 5월 월례회', date:'2025-05-18', thumb:'', desc:'5월 정기 월례회 행사'},
+  {id:2, title:'봄 봉사활동', date:'2025-04-12', thumb:'', desc:'지역 사회복지관 봉사활동'},
+  {id:3, title:'신년하례회', date:'2025-01-10', thumb:'', desc:'2025년 신년하례회 행사'},
+];
+
+function renderGallery(el) {
+  el.innerHTML = `
+  <div class="appbar">
+    <div><div class="appbar-title">행사 갤러리</div><div class="appbar-sub">부산라이온스클럽</div></div>
+    ${isAdmin?`<button onclick="showAddGallery()" style="background:var(--gold);border:none;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--navy-d);cursor:pointer">+ 등록</button>`:''}
+  </div>
+  <div class="scroll" style="padding:16px;padding-bottom:24px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      ${GALLERY.map(g=>`
+        <div onclick="showGalleryDetail(${g.id})" style="background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer">
+          <div style="height:100px;background:linear-gradient(135deg,#1c3e72,#0e2140);display:flex;align-items:center;justify-content:center">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="rgba(255,255,255,.4)"/><path d="M21 15l-5-5L5 21" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div style="padding:10px">
+            <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px">${g.title}</div>
+            <div style="font-size:11px;color:var(--muted)">${g.date}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+function showGalleryDetail(id) {
+  const g = GALLERY.find(x=>x.id===id);
+  if(!g) return;
+  const screens = document.getElementById('screens');
+  const div = document.createElement('div');
+  div.className = 'screen';
+  div.style.cssText = 'position:absolute;inset:0;z-index:10;display:flex;flex-direction:column';
+  screens.appendChild(div);
+  div.innerHTML = `
+  <div class="appbar">
+    <button class="appbar-back" onclick="this.closest('.screen').remove()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 5l-7 7 7 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="appbar-title">${g.title}</div>
+  </div>
+  <div class="scroll" style="padding:20px">
+    <div style="background:linear-gradient(135deg,#1c3e72,#0e2140);border-radius:14px;height:200px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+      <div style="text-align:center;color:rgba(255,255,255,.5)">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <div style="font-size:13px;margin-top:8px">사진을 등록해주세요</div>
+      </div>
+    </div>
+    <div style="font-size:18px;font-weight:800;color:var(--ink);margin-bottom:6px">${g.title}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${g.date}</div>
+    <div style="font-size:15px;color:var(--ink)">${g.desc}</div>
+  </div>`;
+}
+
 </script>
 </body>
 </html>
