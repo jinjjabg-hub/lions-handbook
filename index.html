@@ -1079,6 +1079,7 @@ function doLogout() {
 
 function showLoginScreen() {
   const el = document.getElementById('login-screen');
+  el.style.display = 'block';
   el.innerHTML = `
   <div style="position:fixed;inset:0;background:radial-gradient(130% 90% at 50% 8%,#21477f,#0d1f3d);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;z-index:100">
     <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#d4a017);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#142d52;margin-bottom:20px;box-shadow:0 0 0 8px rgba(240,192,64,.2)">L</div>
@@ -1127,8 +1128,13 @@ function tryLogin() {
   
   const member = doLogin(birth, pw);
   if (member) {
-    document.getElementById('login-screen').style.display = 'none';
-    openApp();
+    const ls = document.getElementById('login-screen');
+    ls.style.display = 'none';
+    ls.innerHTML = '';
+    document.getElementById('cover').style.display = 'none';
+    const main = document.getElementById('main');
+    main.style.display = 'flex';
+    showTab('home');
   } else {
     err.style.display = 'block';
     err.textContent = '생년월일 또는 전화번호가 맞지 않습니다';
