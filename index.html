@@ -1460,8 +1460,8 @@ function uploadMemberPhoto(id, input) {
   const reader = new FileReader();
   reader.onload = (e) => {
     // 로컬 미리보기 (Firebase 연동 전)
-    const imgs = document.querySelectorAll(\`[data-member-id="\${id}"] img\`);
-    showToast(\`\${file.name} 선택됨 (Firebase 연동 후 저장)\`);
+    const imgs = document.querySelectorAll('[data-member-id="' + id + '"] img');
+    showToast(file.name + ' 선택됨 (Firebase 연동 후 저장)');
   };
   reader.readAsDataURL(file);
 }
