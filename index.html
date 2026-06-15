@@ -625,18 +625,18 @@ function renderMemberCard(el, m) {
     <div class="appbar-title">회원 카드</div>
   </div>
   <div class="scroll" style="padding-bottom:30px">
-    <div class="card-hero">
+    <div class="card-hero" style="position:relative">
       ${avatar(m.name, true, 68, m.id)}
-      <div style="flex:1;min-width:0">
+      <div style="flex:1;min-width:0;${m.bizImg||m.bizText?'padding-right:100px':''}">
         <div class="card-name">${m.name}</div>
         <div class="card-rom">${m.rom||''}</div>
         <div class="card-role-badge">${m.role||''}</div>
         ${dica?'<div style="margin-top:6px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--gold);font-weight:700"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" fill="currentColor"/></svg>DiCA 명함 있음</div>':''}
       </div>
       ${m.bizImg
-        ? `<div style="width:90px;height:90px;border-radius:10px;overflow:hidden;flex-shrink:0"><img src="photo/${m.bizImg}" style="width:100%;height:100%;object-fit:cover"/></div>`
+        ? `<div style="position:absolute;top:16px;right:16px;width:88px;height:88px;border-radius:10px;overflow:hidden"><img src="photo/${m.bizImg}" style="width:100%;height:100%;object-fit:cover"/></div>`
         : m.bizText
-          ? `<div style="width:90px;min-height:70px;border:1.5px solid var(--gold);border-radius:10px;padding:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><div style="font-size:11px;font-weight:700;color:var(--gold);text-align:center;line-height:1.6;word-break:keep-all">${m.bizText}</div></div>`
+          ? `<div style="position:absolute;top:16px;right:16px;width:88px;min-height:60px;border:1.5px solid var(--gold);border-radius:10px;padding:8px;display:flex;align-items:center;justify-content:center"><div style="font-size:11px;font-weight:700;color:var(--gold);text-align:center;line-height:1.6;word-break:keep-all">${m.bizText}</div></div>`
           : ''}
     </div>
 
