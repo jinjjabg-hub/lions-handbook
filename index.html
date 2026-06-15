@@ -96,6 +96,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 /* 토스트 */
 #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(14,33,64,.94);color:#fff;padding:12px 22px;border-radius:30px;font-size:14px;font-weight:600;z-index:999;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.3)}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 </head>
 <body>
 <div id="app"><div id="login-screen" style="display:none;position:fixed;inset:0;z-index:9999;background:#0d1f3d"></div>
@@ -169,6 +173,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 <div id="toast"></div>
 
 <script>
+// ===== Firebase 초기화 =====
+const firebaseConfig = {
+  apiKey: "AIzaSyBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  authDomain: "mandu-e7c3c.firebaseapp.com",
+  projectId: "mandu-e7c3c",
+  storageBucket: "mandu-e7c3c.firebasestorage.app",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:000000000000000000000000"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
 // ===== 데이터 =====
 const CLUB = {
   name:'부산라이온스클럽', en:'BUSAN LIONS CLUB', district:'국제라이온스협회 355-A지구',
@@ -299,8 +317,54 @@ function doLogin(birth, phone4) {
 function doLogout() {
   currentUser = null; isAdmin = false;
   sessionStorage.removeItem('lions_user');
+  auth.signOut().catch(() => {});
   document.getElementById('main').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
+  showLoginScreen();
+}
+
+async function initFirestore() {
+  try {
+    const snap = await db.collection('members').limit(1).get();
+    if (!snap.empty) return;
+
+    const apiKey = firebaseConfig.apiKey;
+    const batch = db.batch();
+
+    for (const m of MEMBERS_CLEAN) {
+      const birth = parseBirth(m.b);
+      if (!birth) continue;
+      const phone4 = (m.f || '').replace(/\D/g, '').slice(-4);
+
+      batch.set(db.collection('members').doc(birth), {
+        id: m.id, name: m.name, rom: m.rom || '', role: m.role || '',
+        birth, joined: m.j || '', company: m.co || '', phone: m.f || '',
+        status: m.status || '회원', spouse: m.spouse || '',
+        dica: !!m.dica, coAddr: m.coAddr || ''
+      });
+
+      if (phone4.length === 4) {
+        try {
+          const res = await fetch(
+            'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + apiKey,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: birth + '@lions.kr', password: phone4, returnSecureToken: false })
+            }
+          );
+          const data = await res.json();
+          if (data.error && data.error.message !== 'EMAIL_EXISTS') {
+            console.warn('Auth create:', birth, data.error.message);
+          }
+        } catch (e) { console.warn('Auth error:', birth, e); }
+      }
+    }
+
+    await batch.commit();
+    showToast('회원 데이터 등록 완료');
+  } catch (e) {
+    console.error('initFirestore error:', e);
+  }
 }
 
 function showLoginScreen() {
@@ -327,7 +391,7 @@ function showLoginScreen() {
           onkeydown="if(event.key==='Enter')tryLogin()"
         />
       </div>
-      <button onclick="tryLogin()" style="width:100%;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#d4a017);color:#142d52;font-size:16px;font-weight:800;border:none;cursor:pointer">
+      <button id="login-submit-btn" onclick="tryLogin()" style="width:100%;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#d4a017);color:#142d52;font-size:16px;font-weight:800;border:none;cursor:pointer">
         회원수첩 열기
       </button>
       <div id="login-err" style="text-align:center;color:#ff8080;font-size:13px;margin-top:12px;display:none">
@@ -341,29 +405,68 @@ function showLoginScreen() {
   el.style.display = 'block';
 }
 
-function tryLogin() {
+async function tryLogin() {
   const birth = document.getElementById('login-id').value.trim();
   const pw = document.getElementById('login-pw').value.trim();
   const err = document.getElementById('login-err');
-  
+  const btn = document.getElementById('login-submit-btn');
+
   if (birth.length !== 8 || pw.length !== 4) {
     err.style.display = 'block';
     err.textContent = '생년월일 8자리와 전화번호 끝 4자리를 입력해주세요';
     return;
   }
-  
-  const member = doLogin(birth, pw);
-  if (member) {
+  err.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = '확인 중...'; }
+
+  try {
+    const email = birth + '@lions.kr';
+    const cred = await auth.signInWithEmailAndPassword(email, pw);
+
+    let memberStatus = null;
+    try {
+      const memberDoc = await db.collection('members').doc(birth).get();
+      if (memberDoc.exists) memberStatus = memberDoc.data().status;
+    } catch (e) { /* Firestore 미설정 시 무시 */ }
+
+    if (memberStatus === '탈퇴') {
+      await auth.signOut();
+      err.style.display = 'block';
+      err.textContent = '탈퇴한 회원입니다. 사무장에게 문의하세요.';
+      if (btn) { btn.disabled = false; btn.textContent = '회원수첩 열기'; }
+      return;
+    }
+
+    const localMember = MEMBERS_CLEAN.find(m => parseBirth(m.b) === birth);
+    currentUser = {
+      birth,
+      name: localMember ? localMember.name : '회원',
+      id: localMember ? localMember.id : 0,
+      uid: cred.user.uid
+    };
+    isAdmin = ADMIN_BIRTHS.includes(birth);
+    sessionStorage.setItem('lions_user', JSON.stringify(currentUser));
+
     const ls = document.getElementById('login-screen');
     ls.style.display = 'none';
     ls.innerHTML = '';
     document.getElementById('cover').style.display = 'none';
-    const main = document.getElementById('main');
-    main.style.display = 'flex';
+    document.getElementById('main').style.display = 'flex';
     showTab('home');
-  } else {
+
+    if (isAdmin) initFirestore();
+
+  } catch (e) {
     err.style.display = 'block';
-    err.textContent = '생년월일 또는 전화번호가 맞지 않습니다';
+    const c = e.code || '';
+    if (c === 'auth/user-not-found' || c === 'auth/wrong-password' || c === 'auth/invalid-credential') {
+      err.textContent = '생년월일 또는 전화번호가 맞지 않습니다';
+    } else if (c === 'auth/too-many-requests') {
+      err.textContent = '잠시 후 다시 시도해주세요';
+    } else {
+      err.textContent = '로그인 오류가 발생했습니다. 다시 시도해주세요.';
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '회원수첩 열기'; }
   }
 }
 
@@ -409,10 +512,12 @@ let currentTab = 'home';
 
 function startApp() {
   document.getElementById('cover').style.display = 'none';
-  document.getElementById('main').style.display = 'flex';
-  showTab('home');
-  // TODO: Firebase 연동 후 로그인 활성화
-  // if (checkSession()) { ... } else { showLoginScreen(); }
+  if (checkSession()) {
+    document.getElementById('main').style.display = 'flex';
+    showTab('home');
+  } else {
+    showLoginScreen();
+  }
 }
 function openApp() {
   const main = document.getElementById('main');
@@ -1552,6 +1657,35 @@ function showAdminBlockList() {
   </div>`;
 }
 
+
+// ===== 카카오톡 감지 =====
+(function() {
+  const ua = navigator.userAgent;
+  if (/KAKAOTALK/i.test(ua)) {
+    const href = location.href;
+    if (/Android/i.test(ua)) {
+      location.href = 'intent://' + href.replace(/https?:\/\//, '') +
+        '#Intent;scheme=https;package=com.android.chrome;end';
+    } else if (/iPhone|iPad|iPod/i.test(ua)) {
+      location.href = 'googlechrome://' + href.replace(/https?:\/\//, '');
+      setTimeout(function() { location.replace(href); }, 600);
+    }
+  }
+})();
+
+// ===== Android 뒤로가기 처리 =====
+history.pushState(null, '', location.href);
+window.addEventListener('popstate', function() {
+  history.pushState(null, '', location.href);
+  var screens = document.getElementById('screens');
+  if (!screens) return;
+  var overlays = screens.querySelectorAll('.screen');
+  if (overlays.length > 1) {
+    overlays[overlays.length - 1].remove();
+  } else if (currentTab !== 'home') {
+    showTab('home');
+  }
+});
 
 function showSpouseCard(spouseName, memberId) {
   const screens = document.getElementById('screens');
