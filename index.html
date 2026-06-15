@@ -1172,7 +1172,9 @@ function renderRules(el) {
       <div class="appbar-sub">부산라이온스클럽</div>
     </div>
   </div>
-  <input id="reg-search" class="search-box" placeholder="규정 내 검색..." oninput="searchReg(this.value)" autocomplete="off" style="margin-top:10px"/>
+  <div style="padding:8px 16px;background:var(--paper);flex-shrink:0;border-bottom:1px solid var(--line)">
+    <input id="reg-search" class="search-box" placeholder="규정·회원 이름·직책·사업장 검색" oninput="searchReg(this.value)" autocomplete="off" style="margin:0"/>
+  </div>
   <div class="tab-row" id="reg-tabrow">
     ${tabs.map(t=>`<button class="reg-tab${t===currentRegTab?' active':''}" onclick="switchRegTab('${t}')" id="rtab-${t.replace(/[^a-zA-Z가-힣]/g,'_')}">${t}</button>`).join('')}
   </div>
@@ -1186,16 +1188,83 @@ function switchRegTab(t) {
   const btn = document.getElementById('rtab-'+safe);
   if (btn) btn.classList.add('active');
   document.getElementById('reg-body').innerHTML = REGS[t];
-  document.getElementById('reg-search').value = '';
+  const si = document.getElementById('reg-search');
+  if (si) si.value = '';
+  const tr = document.getElementById('reg-tabrow');
+  if (tr) tr.style.display = '';
 }
 
 function searchReg(q) {
   const kw = q.trim();
   const body = document.getElementById('reg-body');
-  if (!kw) { body.innerHTML = REGS[currentRegTab]; return; }
-  let html = REGS[currentRegTab];
-  const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
-  body.innerHTML = html.replace(re, m => `<mark class="highlight">${m}</mark>`);
+  const tabrow = document.getElementById('reg-tabrow');
+
+  if (!kw) {
+    body.innerHTML = REGS[currentRegTab];
+    if (tabrow) tabrow.style.display = '';
+    return;
+  }
+
+  if (tabrow) tabrow.style.display = 'none';
+
+  const esc = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const mkRe = () => new RegExp(esc, 'gi');
+  const testRe = mkRe();
+
+  let html = '';
+  let found = false;
+
+  // 전체 규정 탭 검색
+  Object.entries(REGS).forEach(([tabName, content]) => {
+    const plain = content.replace(/<[^>]+>/g, ' ');
+    testRe.lastIndex = 0;
+    if (!testRe.test(plain)) return;
+    found = true;
+    const highlighted = content.replace(mkRe(), m => `<mark class="highlight">${m}</mark>`);
+    html += `<div style="margin-bottom:4px">
+      <div style="padding:7px 20px;font-size:11px;font-weight:700;color:var(--navy);background:var(--paper-d);border-bottom:1px solid var(--line);letter-spacing:.04em">${tabName}</div>
+      ${highlighted}
+    </div>`;
+  });
+
+  // 회원 이름·직책·사업장 검색
+  const lcKw = kw.toLowerCase();
+  const matchedMembers = MEMBERS_CLEAN.filter(m =>
+    (m.name + m.role + m.co + m.status + (m.rom || '') + (m.coAddr || '')).toLowerCase().includes(lcKw)
+  );
+  if (matchedMembers.length > 0) {
+    found = true;
+    const hiRe = mkRe();
+    html += `<div style="margin-bottom:4px">
+      <div style="padding:7px 20px;font-size:11px;font-weight:700;color:var(--navy);background:var(--paper-d);border-bottom:1px solid var(--line);letter-spacing:.04em">회원</div>
+      <div style="padding:0 4px">
+        ${matchedMembers.map(m => {
+          hiRe.lastIndex = 0;
+          const hiName = m.name.replace(mkRe(), x => `<mark class="highlight">${x}</mark>`);
+          const hiRole = (m.role || '').replace(mkRe(), x => `<mark class="highlight">${x}</mark>`);
+          const hiCo = (m.co ? m.co.split(' · ')[0] : '').replace(mkRe(), x => `<mark class="highlight">${x}</mark>`);
+          return `<button onclick="showMember(${m.id})" style="width:100%;display:flex;align-items:center;padding:10px 12px;gap:12px;text-align:left;border:none;border-bottom:1px solid var(--line);background:none;cursor:pointer">
+            ${avatar(m.name, m.id===1, 40, m.id)}
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:700;color:var(--ink)">${hiName}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px">${hiRole}${hiCo ? ' · ' + hiCo : ''}</div>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="#bbb" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (!found) {
+    body.innerHTML = `<div style="text-align:center;padding:50px 20px;color:var(--muted)">
+      <div style="font-size:36px;margin-bottom:12px">🔍</div>
+      <div style="font-size:16px;font-weight:700;color:var(--ink)">검색 결과 없음</div>
+      <div style="font-size:13px;margin-top:6px">"${kw}"에 해당하는 내용이 없습니다</div>
+    </div>`;
+  } else {
+    body.innerHTML = html;
+  }
 }
 
 // ===== 연혁 =====
