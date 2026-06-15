@@ -420,10 +420,9 @@ async function tryLogin() {
   err.style.display = 'none';
   if (btn) { btn.disabled = true; btn.textContent = '확인 중...'; }
 
-  try {
-    const email = birth + '@lions.kr';
-    const cred = await auth.signInWithEmailAndPassword(email, pw);
+  const email = birth + '@lions.kr';
 
+  async function onLoginSuccess(cred) {
     let memberStatus = null;
     try {
       const memberDoc = await db.collection('members').doc(birth).get();
@@ -456,18 +455,61 @@ async function tryLogin() {
     showTab('home');
 
     if (isAdmin) initFirestore();
+  }
 
+  // 1단계: Firebase Auth 로그인 시도
+  try {
+    const cred = await auth.signInWithEmailAndPassword(email, pw);
+    await onLoginSuccess(cred);
+    return;
   } catch (e) {
-    err.style.display = 'block';
     const c = e.code || '';
-    if (c === 'auth/user-not-found' || c === 'auth/wrong-password' || c === 'auth/invalid-credential') {
-      err.textContent = '생년월일 또는 전화번호가 맞지 않습니다';
-    } else if (c === 'auth/too-many-requests') {
+    if (c === 'auth/too-many-requests') {
+      err.style.display = 'block';
       err.textContent = '잠시 후 다시 시도해주세요';
-    } else {
-      err.textContent = '로그인 오류가 발생했습니다. 다시 시도해주세요.';
+      if (btn) { btn.disabled = false; btn.textContent = '회원수첩 열기'; }
+      return;
     }
+    // 계정 없음/비밀번호 오류 → 로컬 검증으로 진행
+    if (c !== 'auth/user-not-found' && c !== 'auth/wrong-password' && c !== 'auth/invalid-credential') {
+      err.style.display = 'block';
+      err.textContent = '로그인 오류가 발생했습니다. 다시 시도해주세요.';
+      if (btn) { btn.disabled = false; btn.textContent = '회원수첩 열기'; }
+      return;
+    }
+  }
+
+  // 2단계: 로컬 MEMBERS_CLEAN 검증
+  const localMember = MEMBERS_CLEAN.find(m => {
+    const b = parseBirth(m.b);
+    const p = (m.f || '').replace(/\D/g, '').slice(-4);
+    return b === birth && p === pw;
+  });
+
+  if (!localMember) {
+    err.style.display = 'block';
+    err.textContent = '생년월일 또는 전화번호가 맞지 않습니다';
     if (btn) { btn.disabled = false; btn.textContent = '회원수첩 열기'; }
+    return;
+  }
+
+  // 3단계: 로컬 검증 성공 → Firebase Auth 계정 자동 생성 후 로그인
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, pw);
+    await onLoginSuccess(cred);
+  } catch (e) {
+    // 계정 생성 실패해도 로컬 세션으로 진입
+    console.warn('Auth createUser failed:', e.code);
+    currentUser = { birth, name: localMember.name, id: localMember.id, uid: '' };
+    isAdmin = ADMIN_BIRTHS.includes(birth);
+    sessionStorage.setItem('lions_user', JSON.stringify(currentUser));
+    const ls = document.getElementById('login-screen');
+    ls.style.display = 'none';
+    ls.innerHTML = '';
+    document.getElementById('cover').style.display = 'none';
+    document.getElementById('main').style.display = 'flex';
+    showTab('home');
+    if (isAdmin) initFirestore();
   }
 }
 
