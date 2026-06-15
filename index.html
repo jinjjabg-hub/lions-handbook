@@ -300,7 +300,7 @@ function doLogout() {
   currentUser = null; isAdmin = false;
   sessionStorage.removeItem('lions_user');
   document.getElementById('main').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
+  showLoginScreen();
 }
 
 function showLoginScreen() {
