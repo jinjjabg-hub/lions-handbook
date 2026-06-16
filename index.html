@@ -737,7 +737,7 @@ function showOrgChart() {
   ov.onclick = function(e){ if(e.target===ov) document.body.removeChild(ov); };
   ov.innerHTML = `
     <button onclick="this.closest('div').parentNode && document.body.removeChild(this.closest('div'))" style="position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1">✕</button>
-    <img src="photo/org_chart.jpg" style="max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom"/>`;
+    <img src="photo/org_chart.png" style="max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom"/>`;
   document.body.appendChild(ov);
 }
 
