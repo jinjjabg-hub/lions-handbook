@@ -105,14 +105,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
     <div class="cover-frame"></div>
     <div class="cover-frame2"></div>
     <div style="padding-top:56px">
-      <div style="font-size:12px;letter-spacing:3px;color:var(--gold-l);font-weight:600">국제라이온스협회 355-A지구</div>
+      <div style="font-size:12px;letter-spacing:3px;color:var(--gold-l);font-weight:600">부산라이온스클럽</div>
       <div style="width:36px;height:1px;background:var(--gold);margin:12px auto 0;opacity:.7"></div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:center">
       <img src="photo/lions_logo_transparent.png" style="width:130px;height:130px;object-fit:contain"/>
       <div style="margin-top:28px">
-        <h1 style="font-size:30px;font-weight:800;letter-spacing:1px">부산라이온스클럽</h1>
-        <div style="font-size:13px;letter-spacing:4px;color:var(--gold-l);margin-top:10px;font-weight:500">BUSAN LIONS CLUB</div>
+        <h1 style="font-size:24px;font-weight:800;letter-spacing:0px;line-height:1.3">국제라이온스협회<br>355-A(부산)지구</h1>
+        <div style="font-size:12px;letter-spacing:3px;color:var(--gold-l);margin-top:10px;font-weight:500">LIONS CLUBS INTERNATIONAL</div>
       </div>
       <div style="display:inline-flex;align-items:center;gap:10px;margin-top:20px;padding:9px 20px;border-radius:30px;background:rgba(240,192,64,.13);border:1px solid rgba(240,192,64,.4)">
         <span style="font-size:15px;color:var(--gold);font-weight:700">제65대</span>
@@ -171,7 +171,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 <script>
 // ===== 데이터 =====
 const CLUB = {
-  name:'부산라이온스클럽', en:'BUSAN LIONS CLUB', district:'국제라이온스협회 355-A지구',
+  name:'부산라이온스클럽', en:'BUSAN LIONS CLUB', district:'국제라이온스협회 355-A(부산)지구',
   no:'No. 025769', term:'2024 – 2025', gen:'제65대',
   founded:'1960년 6월 18일', charter:'1960년 9월 24일',
   board:'매월 3일', monthly:'매월 18일',
@@ -309,8 +309,8 @@ function showLoginScreen() {
   el.innerHTML = `
   <div style="position:fixed;inset:0;background:radial-gradient(130% 90% at 50% 8%,#21477f,#0d1f3d);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;z-index:100">
     <img src="photo/lions_logo_transparent.png" style="width:110px;height:110px;object-fit:contain;margin-bottom:20px"/>
-    <div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:4px">부산라이온스클럽</div>
-    <div style="font-size:13px;color:rgba(247,230,173,.7);margin-bottom:36px;letter-spacing:2px">BUSAN LIONS CLUB</div>
+    <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px;line-height:1.3;text-align:center">국제라이온스협회<br>355-A(부산)지구</div>
+    <div style="font-size:12px;color:rgba(247,230,173,.7);margin-bottom:36px;letter-spacing:2px">LIONS CLUBS INTERNATIONAL</div>
     
     <div style="width:100%;max-width:320px;background:rgba(255,255,255,.08);border-radius:20px;padding:24px;backdrop-filter:blur(10px)">
       <div style="margin-bottom:16px">
@@ -457,7 +457,7 @@ function renderHome(el) {
   el.innerHTML = `
   <div class="appbar">
     <div style="flex:1">
-      <div class="appbar-title">부산라이온스클럽</div>
+      <div class="appbar-title">국제라이온스협회 355-A(부산)지구</div>
       <div class="appbar-sub">제65대 · 2024 – 2025 ${userName?'· '+userName+' L':''}</div>
     </div>
     <button onclick="doLogout()" style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:6px 10px;color:#fff;font-size:12px;cursor:pointer">로그아웃</button>
