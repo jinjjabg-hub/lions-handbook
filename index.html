@@ -103,6 +103,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 /* 토스트 */
 #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(14,33,64,.94);color:#fff;padding:12px 22px;border-radius:30px;font-size:14px;font-weight:600;z-index:999;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.3)}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 </head>
 <body>
 <div id="app"><div id="login-screen" style="display:none;position:fixed;inset:0;z-index:9999;background:#0d1f3d"></div>
@@ -176,6 +180,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 <div id="toast"></div>
 
 <script>
+// ===== Firebase 초기화 =====
+const firebaseConfig = {
+  apiKey: "AIzaSyAZoWSGSA81daZydNgzegct2aaeFbDajr0",
+  authDomain: "mandu-e7c3c.firebaseapp.com",
+  projectId: "mandu-e7c3c",
+  storageBucket: "mandu-e7c3c.firebasestorage.app",
+  messagingSenderId: "196338490174",
+  appId: "1:196338490174:web:78dc77e684945aca362a6f"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+const _unsubs = {};
+
 // ===== 데이터 =====
 const CLUB = {
   name:'부산라이온스클럽', en:'BUSAN LIONS CLUB', district:'국제라이온스협회 355-A(부산)지구',
@@ -304,6 +323,8 @@ function doLogin(birth, phone4) {
 }
 
 function doLogout() {
+  auth.signOut().catch(()=>{});
+  Object.values(_unsubs).forEach(f => f && f());
   currentUser = null; isAdmin = false;
   sessionStorage.removeItem('lions_user');
   document.getElementById('main').style.display = 'none';
@@ -334,7 +355,7 @@ function showLoginScreen() {
           onkeydown="if(event.key==='Enter')tryLogin()"
         />
       </div>
-      <button onclick="tryLogin()" style="width:100%;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#d4a017);color:#142d52;font-size:16px;font-weight:800;border:none;cursor:pointer">
+      <button id="login-btn" onclick="tryLogin()" style="width:100%;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--gold),#d4a017);color:#142d52;font-size:16px;font-weight:800;border:none;cursor:pointer">
         회원수첩 열기
       </button>
       <div id="login-err" style="text-align:center;color:#ff8080;font-size:13px;margin-top:12px;display:none">
@@ -348,35 +369,207 @@ function showLoginScreen() {
   el.style.display = 'block';
 }
 
-function tryLogin() {
+async function tryLogin() {
   const birth = document.getElementById('login-id').value.trim();
   const pw = document.getElementById('login-pw').value.trim();
-  const err = document.getElementById('login-err');
-  
+  const errEl = document.getElementById('login-err');
+
   if (birth.length !== 8 || pw.length !== 4) {
-    err.style.display = 'block';
-    err.textContent = '생년월일 8자리와 전화번호 끝 4자리를 입력해주세요';
+    errEl.style.display = 'block';
+    errEl.textContent = '생년월일 8자리와 전화번호 끝 4자리를 입력해주세요';
     return;
   }
-  
-  const member = doLogin(birth, pw);
-  if (member) {
-    const ls = document.getElementById('login-screen');
-    ls.style.display = 'none';
-    ls.innerHTML = '';
-    document.getElementById('cover').style.display = 'none';
-    const main = document.getElementById('main');
-    main.style.display = 'flex';
-    showTab('home');
-  } else {
-    err.style.display = 'block';
-    err.textContent = '생년월일 또는 전화번호가 맞지 않습니다';
+
+  errEl.style.display = 'none';
+  const loginBtn = document.getElementById('login-btn');
+  if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = '확인 중...'; }
+
+  const email = birth + '@lions.kr';
+
+  function setUser(name, id) {
+    currentUser = { birth, name, id };
+    isAdmin = ADMIN_BIRTHS.includes(birth);
+    sessionStorage.setItem('lions_user', JSON.stringify(currentUser));
   }
+
+  function loginFailed(msg) {
+    errEl.style.display = 'block';
+    errEl.textContent = msg || '생년월일 또는 전화번호가 맞지 않습니다';
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '회원수첩 열기'; }
+  }
+
+  try {
+    await auth.signInWithEmailAndPassword(email, pw);
+
+    // 탈퇴 여부 확인
+    try {
+      const snap = await db.collection('members').doc(birth).get();
+      if (snap.exists && snap.data().status === '탈퇴') {
+        await auth.signOut();
+        loginFailed('탈퇴 처리된 회원입니다. 사무장에게 문의하세요.');
+        return;
+      }
+      if (snap.exists) {
+        const d = snap.data();
+        setUser(d.name || birth, d.id || birth);
+      } else {
+        const localM = MEMBERS_CLEAN.find(m => parseBirth(m.b) === birth);
+        setUser(localM ? localM.name : birth, localM ? localM.id : birth);
+      }
+    } catch(fe) {
+      const localM = MEMBERS_CLEAN.find(m => parseBirth(m.b) === birth);
+      setUser(localM ? localM.name : birth, localM ? localM.id : birth);
+    }
+
+    if (isAdmin) initFirestore().catch(()=>{});
+    onLoginSuccess();
+
+  } catch(e) {
+    const isAuthErr = ['auth/user-not-found','auth/wrong-password','auth/invalid-credential','auth/invalid-email'].includes(e.code);
+
+    const localM = MEMBERS_CLEAN.find(m => {
+      const b = parseBirth(m.b);
+      const p = (m.f||'').replace(/\D/g,'').slice(-4);
+      return b === birth && p === pw;
+    });
+
+    if (!localM) {
+      loginFailed('생년월일 또는 전화번호가 맞지 않습니다');
+      return;
+    }
+
+    setUser(localM.name, localM.id);
+
+    if (isAuthErr) {
+      auth.createUserWithEmailAndPassword(email, pw).catch(()=>{});
+    }
+
+    if (isAdmin) initFirestore().catch(()=>{});
+    onLoginSuccess();
+  }
+}
+
+function onLoginSuccess() {
+  const ls = document.getElementById('login-screen');
+  ls.style.display = 'none';
+  ls.innerHTML = '';
+  document.getElementById('cover').style.display = 'none';
+  document.getElementById('main').style.display = 'flex';
+  showTab('home');
 }
 
 
 const MEMBERS_CLEAN = MEMBERS.filter((m,i,a) => m.name && m.f && a.findIndex(x=>x.name===m.name)===i);
 MEMBERS_CLEAN.forEach(m => { if(m.bizImg===undefined) m.bizImg=''; if(m.bizText===undefined) m.bizText=''; });
+
+// ===== Firestore 동기화 =====
+async function initFirestore() {
+  try {
+    const snap = await db.collection('members').limit(1).get();
+    if (!snap.empty) return;
+    const batch = db.batch();
+    MEMBERS_CLEAN.forEach(m => {
+      const birth = parseBirth(m.b);
+      if (!birth || birth.length !== 8) return;
+      const ref = db.collection('members').doc(birth);
+      batch.set(ref, {
+        id: m.id, name: m.name, birth, role: m.role||'', co: m.co||'',
+        coAddr: m.coAddr||'', f: m.f||'', b: m.b||'', spouse: m.spouse||'',
+        j: m.j||'', dicaUrl: m.dicaUrl||'', bizImg: m.bizImg||'', bizText: m.bizText||'',
+        status: 'active', updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    await batch.commit();
+  } catch(e) { console.warn('initFirestore:', e); }
+}
+
+async function saveNotice() {
+  const title = (document.getElementById('notice-title')||{}).value?.trim();
+  const content = (document.getElementById('notice-content')||{}).value?.trim();
+  if (!title || !content) { showToast('제목과 내용을 입력해주세요'); return; }
+  try {
+    await db.collection('notices').add({
+      title, content, author: currentUser ? currentUser.name : '',
+      date: new Date().toISOString().slice(0,10),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('공지사항이 등록됐습니다');
+    setTimeout(() => { const ss = document.querySelectorAll('#screens .screen'); if (ss.length>1) ss[ss.length-1].remove(); }, 800);
+  } catch(e) { showToast('등록 실패: ' + e.message); }
+}
+
+async function saveNewMember() {
+  const g = id => (document.getElementById(id)||{}).value?.trim()||'';
+  const name = g('new-name'), b = g('new-b'), f = g('new-f');
+  if (!name || !b || !f) { showToast('이름, 생년월일, 휴대폰은 필수입니다'); return; }
+  const birth = parseBirth(b);
+  if (birth.length !== 8) { showToast('생년월일 형식을 확인해주세요 (예: 1990.1.1)'); return; }
+  const newId = Math.max(...MEMBERS_CLEAN.map(m=>m.id), 0) + 1;
+  const member = { id: newId, name, role: g('new-role'), co: g('new-co'), coAddr: g('new-coAddr'),
+    f, b, spouse: g('new-spouse'), j: g('new-j'), bizImg: '', bizText: '', dicaUrl: '' };
+  try {
+    await db.collection('members').doc(birth).set({
+      ...member, birth, status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    MEMBERS_CLEAN.push(member);
+    showToast(name + ' 회원이 등록됐습니다');
+    setTimeout(() => { const ss = document.querySelectorAll('#screens .screen'); if (ss.length>1) ss[ss.length-1].remove(); }, 800);
+  } catch(e) { showToast('등록 실패: ' + e.message); }
+}
+
+async function saveGalleryEntry() {
+  const title = (document.getElementById('gallery-title')||{}).value?.trim();
+  const date = (document.getElementById('gallery-date')||{}).value||'';
+  const desc = (document.getElementById('gallery-desc')||{}).value?.trim()||'';
+  if (!title) { showToast('행사명을 입력해주세요'); return; }
+  const btn = document.getElementById('gallery-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '등록 중...'; }
+  let thumbUrl = '';
+  try {
+    const fileInput = document.getElementById('gallery-file');
+    if (fileInput && fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      const ref = storage.ref('gallery/' + Date.now() + '_' + file.name);
+      const snap = await ref.put(file);
+      thumbUrl = await snap.ref.getDownloadURL();
+    }
+    await db.collection('gallery').add({
+      title, date, desc, thumb: thumbUrl,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('갤러리에 등록됐습니다');
+    setTimeout(() => { const ss = document.querySelectorAll('#screens .screen'); if (ss.length>1) ss[ss.length-1].remove(); }, 800);
+  } catch(e) {
+    showToast('등록 실패: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '등록하기'; }
+  }
+}
+
+async function restoreMember(birth) {
+  try {
+    await db.collection('members').doc(birth).set({ status: 'active' }, { merge: true });
+    showToast('복귀 처리됐습니다');
+    showAdminBlockList();
+    const ss = document.querySelectorAll('#screens .screen');
+    if (ss.length > 1) ss[ss.length-2].remove();
+  } catch(e) { showToast('처리 실패: ' + e.message); }
+}
+
+async function savePresidentInfo() {
+  const name = (document.getElementById('pres-name')||{}).value?.trim()||'';
+  const gen = (document.getElementById('pres-gen')||{}).value?.trim()||'';
+  const guide = (document.getElementById('pres-guide')||{}).value?.trim()||'';
+  try {
+    await db.collection('settings').doc('president').set(
+      { name, gen, guide, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }
+    );
+    CLUB.presidentGuide = guide;
+    showToast('저장됐습니다');
+  } catch(e) { showToast('저장 실패: ' + e.message); }
+}
+
+let firestoreNotices = null;
+let firestoreGallery = null;
 
 const KA = ['가','나','다','라','마','바','사','아','자','차','카','타','파','하'];
 
@@ -417,10 +610,13 @@ let currentTab = 'home';
 
 function startApp() {
   document.getElementById('cover').style.display = 'none';
-  document.getElementById('main').style.display = 'flex';
-  showTab('home');
-  // TODO: Firebase 연동 후 로그인 활성화
-  // if (checkSession()) { ... } else { showLoginScreen(); }
+  if (checkSession()) {
+    document.getElementById('main').style.display = 'flex';
+    if (isAdmin) initFirestore().catch(()=>{});
+    showTab('home');
+  } else {
+    showLoginScreen();
+  }
 }
 function openApp() {
   const main = document.getElementById('main');
@@ -430,6 +626,7 @@ function openApp() {
 
 function showTab(tab) {
   currentTab = tab;
+  Object.keys(_unsubs).forEach(k => { if (_unsubs[k]) { _unsubs[k](); _unsubs[k]=null; } });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
   const screens = document.getElementById('screens');
@@ -1386,35 +1583,43 @@ const NOTICES = [
   {id:3, title:'6월 봉사활동 안내', date:'2025-06-01', content:'6월 봉사활동은 6월 14일(토) 오전 10시, 부산 사회복지관에서 진행됩니다.', author:'회장'},
 ];
 
-function renderNews(el) {
-  el.innerHTML = `
-  <div class="appbar">
-    <div><div class="appbar-title">소식 · 공지사항</div><div class="appbar-sub">부산라이온스클럽</div></div>
-    ${isAdmin?`<button onclick="showAddNotice()" style="background:var(--gold);border:none;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--navy-d);cursor:pointer">+ 등록</button>`:''}
-  </div>
-  <div class="scroll" style="padding-bottom:24px">
-    <div id="notice-list"></div>
-  </div>`;
-  
-  const list = el.querySelector('#notice-list');
-  if (NOTICES.length === 0) {
-    list.innerHTML = '<div style="text-align:center;color:var(--muted);margin-top:60px;font-size:15px">등록된 공지사항이 없습니다</div>';
+function renderNoticeList(listEl, notices) {
+  if (!notices || notices.length === 0) {
+    listEl.innerHTML = '<div style="text-align:center;color:var(--muted);margin-top:60px;font-size:15px">등록된 공지사항이 없습니다</div>';
     return;
   }
-  
-  list.innerHTML = NOTICES.map(n => `
-    <div onclick="showNoticeDetail(${n.id})" style="background:var(--card);border-bottom:1px solid var(--line);padding:16px 20px;cursor:pointer">
+  listEl.innerHTML = notices.map(n => `
+    <div onclick="showNoticeDetail('${String(n.id).replace(/'/g,'')}')" style="background:var(--card);border-bottom:1px solid var(--line);padding:16px 20px;cursor:pointer">
       <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px">${n.title}</div>
       <div style="display:flex;gap:12px;font-size:12px;color:var(--muted)">
-        <span>${n.date}</span>
-        <span>${n.author}</span>
+        <span>${n.date||''}</span>
+        <span>${n.author||''}</span>
       </div>
     </div>
   `).join('');
 }
 
+function renderNews(el) {
+  el.innerHTML = `
+  <div class="appbar">
+    <div><div class="appbar-title">소식 · 공지사항</div><div class="appbar-sub">부산라이온스클럽</div></div>
+    ${isAdmin?`<button onclick="showAdminAddNotice()" style="background:var(--gold);border:none;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--navy-d);cursor:pointer">+ 등록</button>`:''}
+  </div>
+  <div class="scroll" style="padding-bottom:24px">
+    <div id="notice-list"><div style="text-align:center;color:var(--muted);padding:40px;font-size:14px">불러오는 중...</div></div>
+  </div>`;
+
+  const listEl = el.querySelector('#notice-list');
+  _unsubs['news'] = db.collection('notices').orderBy('createdAt','desc').onSnapshot(snap => {
+    if (snap.empty) { renderNoticeList(listEl, NOTICES); return; }
+    firestoreNotices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderNoticeList(listEl, firestoreNotices);
+  }, () => { renderNoticeList(listEl, NOTICES); });
+}
+
 function showNoticeDetail(id) {
-  const n = NOTICES.find(x=>x.id===id);
+  const pool = firestoreNotices || NOTICES;
+  const n = pool.find(x => String(x.id) === String(id));
   if(!n) return;
   const screens = document.getElementById('screens');
   const div = document.createElement('div');
@@ -1442,31 +1647,52 @@ const GALLERY = [
   {id:3, title:'신년하례회', date:'2025-01-10', thumb:'', desc:'2025년 신년하례회 행사'},
 ];
 
+function galleryThumb(g) {
+  if (g.thumb) return `<img src="${g.thumb}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/>`;
+  return `<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="rgba(255,255,255,.4)"/><path d="M21 15l-5-5L5 21" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+}
+
+function renderGalleryGrid(gridEl, list) {
+  if (!list || list.length === 0) {
+    gridEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px;font-size:14px">등록된 사진이 없습니다</div>';
+    return;
+  }
+  gridEl.innerHTML = list.map(g => `
+    <div onclick="showGalleryDetail('${String(g.id).replace(/'/g,'')}')" style="background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer">
+      <div style="height:100px;background:linear-gradient(135deg,#1c3e72,#0e2140);display:flex;align-items:center;justify-content:center;overflow:hidden">
+        ${galleryThumb(g)}
+      </div>
+      <div style="padding:10px">
+        <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px">${g.title}</div>
+        <div style="font-size:11px;color:var(--muted)">${g.date||''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
 function renderGallery(el) {
   el.innerHTML = `
   <div class="appbar">
     <div><div class="appbar-title">행사 갤러리</div><div class="appbar-sub">부산라이온스클럽</div></div>
-    ${isAdmin?`<button onclick="showAddGallery()" style="background:var(--gold);border:none;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--navy-d);cursor:pointer">+ 등록</button>`:''}
+    ${isAdmin?`<button onclick="showAdminAddGallery()" style="background:var(--gold);border:none;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--navy-d);cursor:pointer">+ 등록</button>`:''}
   </div>
   <div class="scroll" style="padding:16px;padding-bottom:24px">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      ${GALLERY.map(g=>`
-        <div onclick="showGalleryDetail(${g.id})" style="background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer">
-          <div style="height:100px;background:linear-gradient(135deg,#1c3e72,#0e2140);display:flex;align-items:center;justify-content:center">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="rgba(255,255,255,.4)"/><path d="M21 15l-5-5L5 21" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </div>
-          <div style="padding:10px">
-            <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px">${g.title}</div>
-            <div style="font-size:11px;color:var(--muted)">${g.date}</div>
-          </div>
-        </div>
-      `).join('')}
+    <div id="gallery-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px;font-size:14px">불러오는 중...</div>
     </div>
   </div>`;
+
+  const gridEl = el.querySelector('#gallery-grid');
+  _unsubs['gallery'] = db.collection('gallery').orderBy('createdAt','desc').onSnapshot(snap => {
+    if (snap.empty) { renderGalleryGrid(gridEl, GALLERY); return; }
+    firestoreGallery = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderGalleryGrid(gridEl, firestoreGallery);
+  }, () => { renderGalleryGrid(gridEl, GALLERY); });
 }
 
 function showGalleryDetail(id) {
-  const g = GALLERY.find(x=>x.id===id);
+  const pool = firestoreGallery || GALLERY;
+  const g = pool.find(x => String(x.id) === String(id));
   if(!g) return;
   const screens = document.getElementById('screens');
   const div = document.createElement('div');
@@ -1481,15 +1707,12 @@ function showGalleryDetail(id) {
     <div class="appbar-title">${g.title}</div>
   </div>
   <div class="scroll" style="padding:20px">
-    <div style="background:linear-gradient(135deg,#1c3e72,#0e2140);border-radius:14px;height:200px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
-      <div style="text-align:center;color:rgba(255,255,255,.5)">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <div style="font-size:13px;margin-top:8px">사진을 등록해주세요</div>
-      </div>
+    <div style="background:linear-gradient(135deg,#1c3e72,#0e2140);border-radius:14px;height:200px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;overflow:hidden">
+      ${g.thumb ? `<img src="${g.thumb}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="text-align:center;color:rgba(255,255,255,.5)"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><div style="font-size:13px;margin-top:8px">사진 없음</div></div>`}
     </div>
     <div style="font-size:18px;font-weight:800;color:var(--ink);margin-bottom:6px">${g.title}</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${g.date}</div>
-    <div style="font-size:15px;color:var(--ink)">${g.desc}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${g.date||''}</div>
+    <div style="font-size:15px;color:var(--ink)">${g.desc||''}</div>
   </div>`;
 }
 
@@ -1562,7 +1785,7 @@ function renderAdminPage(el) {
     </div>
 
     <div style="margin:16px;padding:12px 16px;background:var(--paper-d);border-radius:12px;font-size:12px;color:var(--muted);line-height:1.7">
-      ⚠️ Firebase 연동 후 실제 데이터가 저장됩니다.<br>현재는 UI 미리보기 상태입니다.
+      ℹ️ 모든 변경사항은 Firebase에 실시간으로 저장됩니다.
     </div>
   </div>`;
 }
@@ -1630,17 +1853,42 @@ function showAdminEditMember(id) {
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">명함 텍스트 (이미지 없을 때 표시)</label>
       <input id="edit-bizText-${id}" value="${m.bizText||''}" placeholder="예: 세림기업 · 대표이사" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"/>
     </div>
-    <button onclick="saveAdminEdit(${id})" class="btn-primary" style="margin-top:8px">저장 (Firebase 연동 후 적용)</button>
+    <button onclick="saveAdminEdit(${id})" class="btn-primary" style="margin-top:8px">저장하기</button>
     <button onclick="if(confirm('정말 탈퇴 처리하시겠습니까?')) blockMember(${id})" style="width:100%;height:48px;border-radius:12px;background:none;border:1.5px solid #e44;color:#e44;font-size:15px;font-weight:600;cursor:pointer;margin-top:10px">탈퇴 처리</button>
   </div>`;
 }
 
-function saveAdminEdit(id) {
-  showToast('Firebase 연동 후 저장됩니다');
+async function saveAdminEdit(id) {
+  const m = MEMBERS_CLEAN.find(x=>x.id===id);
+  if (!m) return;
+  const g = k => (document.getElementById('edit-'+k+'-'+id)||{}).value?.trim()||'';
+  const data = {
+    name: g('name'), role: g('role'), co: g('co'), coAddr: g('coAddr'),
+    f: g('f'), b: g('b'), spouse: g('spouse'),
+    dicaUrl: g('dica'), bizImg: g('bizImg'), bizText: g('bizText'),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  const birth = parseBirth(m.b);
+  try {
+    await db.collection('members').doc(birth).set(data, { merge: true });
+    Object.assign(m, data);
+    showToast('저장됐습니다');
+  } catch(e) {
+    // 로컬 업데이트만
+    Object.assign(m, data);
+    showToast('저장됐습니다 (오프라인)');
+  }
 }
 
-function blockMember(id) {
-  showToast('탈퇴 처리됐습니다 (Firebase 연동 후 적용)');
+async function blockMember(id) {
+  const m = MEMBERS_CLEAN.find(x=>x.id===id);
+  if (!m) return;
+  const birth = parseBirth(m.b);
+  try {
+    await db.collection('members').doc(birth).set({ status: '탈퇴' }, { merge: true });
+    showToast(m.name + ' 탈퇴 처리됐습니다');
+    setTimeout(() => { const ss = document.querySelectorAll('#screens .screen'); if (ss.length>1) ss[ss.length-1].remove(); }, 800);
+  } catch(e) { showToast('처리 실패: ' + e.message); }
 }
 
 function showAdminAddMember() {
@@ -1657,12 +1905,12 @@ function showAdminAddMember() {
     <div class="appbar-title">신규 회원 등록</div>
   </div>
   <div class="scroll" style="padding:16px;padding-bottom:30px">
-    ${['이름', 'LC직책', '직업/회사', '근무처 주소', '휴대폰', '생년월일 (예:1990.1.1)', '배우자 이름', '입회연도'].map(label => `
+    ${[['이름','new-name'],['LC직책','new-role'],['직업/회사','new-co'],['근무처 주소','new-coAddr'],['휴대폰','new-f'],['생년월일 (예:1990.1.1)','new-b'],['배우자 이름','new-spouse'],['입회연도','new-j']].map(([label,id]) => `
     <div style="margin-bottom:14px">
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">${label}</label>
-      <input placeholder="${label}" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"/>
+      <input id="${id}" placeholder="${label}" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"/>
     </div>`).join('')}
-    <button onclick="showToast('Firebase 연동 후 저장됩니다')" class="btn-primary" style="margin-top:8px">등록하기</button>
+    <button onclick="saveNewMember()" class="btn-primary" style="margin-top:8px">등록하기</button>
   </div>`;
 }
 
@@ -1698,16 +1946,21 @@ function showAdminPhotoUpload() {
   </div>`;
 }
 
-function uploadMemberPhoto(id, input) {
+async function uploadMemberPhoto(id, input) {
   const file = input.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    // 로컬 미리보기 (Firebase 연동 전)
-    const imgs = document.querySelectorAll('[data-member-id="' + id + '"] img');
-    showToast(file.name + ' 선택됨 (Firebase 연동 후 저장)');
-  };
-  reader.readAsDataURL(file);
+  showToast('업로드 중...');
+  try {
+    const ref = storage.ref('members/' + id + '.jpg');
+    const snap = await ref.put(file);
+    const url = await snap.ref.getDownloadURL();
+    const m = MEMBERS_CLEAN.find(x=>x.id===id);
+    if (m) {
+      const birth = parseBirth(m.b);
+      await db.collection('members').doc(birth).set({ photoUrl: url }, { merge: true });
+    }
+    showToast('사진이 업로드됐습니다');
+  } catch(e) { showToast('업로드 실패: ' + e.message); }
 }
 
 function showAdminAddNotice() {
@@ -1732,7 +1985,7 @@ function showAdminAddNotice() {
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">내용</label>
       <textarea id="notice-content" placeholder="공지 내용을 입력하세요" rows="8" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none;resize:none;line-height:1.7"></textarea>
     </div>
-    <button onclick="showToast('Firebase 연동 후 등록됩니다')" class="btn-primary">등록하기</button>
+    <button onclick="saveNotice()" class="btn-primary">등록하기</button>
   </div>`;
 }
 
@@ -1752,25 +2005,25 @@ function showAdminAddGallery() {
   <div class="scroll" style="padding:16px;padding-bottom:30px">
     <div style="margin-bottom:14px">
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">행사명</label>
-      <input placeholder="예: 2025년 6월 월례회" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"/>
+      <input id="gallery-title" placeholder="예: 2025년 6월 월례회" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"/>
     </div>
     <div style="margin-bottom:14px">
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">행사 날짜</label>
-      <input type="date" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"/>
+      <input id="gallery-date" type="date" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"/>
     </div>
     <div style="margin-bottom:14px">
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">사진 선택</label>
       <label style="display:block;border:2px dashed var(--line);border-radius:12px;padding:30px;text-align:center;cursor:pointer;color:var(--muted)">
         <div style="font-size:32px;margin-bottom:8px">📷</div>
         <div style="font-size:14px">사진을 선택하거나 여기에 끌어다 놓으세요</div>
-        <input type="file" accept="image/*" multiple style="display:none"/>
+        <input id="gallery-file" type="file" accept="image/*" style="display:none"/>
       </label>
     </div>
     <div style="margin-bottom:14px">
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">설명</label>
-      <textarea placeholder="행사 설명" rows="4" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none;resize:none"></textarea>
+      <textarea id="gallery-desc" placeholder="행사 설명" rows="4" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none;resize:none"></textarea>
     </div>
-    <button onclick="showToast('Firebase 연동 후 등록됩니다')" class="btn-primary">등록하기</button>
+    <button id="gallery-save-btn" onclick="saveGalleryEntry()" class="btn-primary">등록하기</button>
   </div>`;
 }
 
@@ -1787,13 +2040,28 @@ function showAdminBlockList() {
     </button>
     <div class="appbar-title">탈퇴 회원 관리</div>
   </div>
-  <div class="scroll" style="padding:20px;padding-bottom:30px">
-    <div style="text-align:center;color:var(--muted);margin-top:40px">
-      <div style="font-size:40px;margin-bottom:12px">✅</div>
-      <div style="font-size:15px">탈퇴 처리된 회원이 없습니다</div>
-      <div style="font-size:13px;margin-top:6px">Firebase 연동 후 실시간 관리됩니다</div>
-    </div>
+  <div class="scroll" style="padding:16px;padding-bottom:30px" id="block-list-content">
+    <div style="text-align:center;color:var(--muted);padding:40px;font-size:14px">불러오는 중...</div>
   </div>`;
+
+  db.collection('members').where('status','==','탈퇴').get().then(snap => {
+    const listEl = div.querySelector('#block-list-content');
+    if (snap.empty) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--muted);margin-top:40px"><div style="font-size:40px;margin-bottom:12px">✅</div><div style="font-size:15px">탈퇴 처리된 회원이 없습니다</div></div>';
+      return;
+    }
+    listEl.innerHTML = snap.docs.map(d => {
+      const m = d.data();
+      return `<div style="display:flex;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);gap:12px">
+        ${avatar(m.name||'?', false, 40, null)}
+        <div style="flex:1"><div style="font-size:15px;font-weight:700">${m.name||'?'}</div><div style="font-size:12px;color:var(--muted)">${m.birth||d.id}</div></div>
+        <button onclick="restoreMember('${d.id}')" style="padding:6px 12px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer">복귀</button>
+      </div>`;
+    }).join('');
+  }).catch(() => {
+    const listEl = div.querySelector('#block-list-content');
+    listEl.innerHTML = '<div style="text-align:center;color:#e44;padding:30px">불러오기 실패</div>';
+  });
 }
 
 
@@ -1823,7 +2091,7 @@ function showAdminEditPresident() {
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">회장 지침 (슬로건)</label>
       <textarea id="pres-guide" rows="3" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none;resize:none;line-height:1.7">${CLUB.presidentGuide}</textarea>
     </div>
-    <button onclick="showToast('Firebase 연동 후 저장됩니다')" class="btn-primary">저장하기</button>
+    <button onclick="savePresidentInfo()" class="btn-primary">저장하기</button>
   </div>`;
 }
 
