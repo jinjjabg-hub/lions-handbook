@@ -105,17 +105,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 <div id="app"><div id="login-screen" style="display:none;position:fixed;inset:0;z-index:9999;background:#0d1f3d"></div>
 
   <!-- 표지 -->
-  <div id="cover" style="position:relative">
+  <div id="cover">
     <div class="cover-frame"></div>
     <div class="cover-frame2"></div>
-    <img src="photo/splash_image.jpg" style="position:absolute;inset:0;width:100%;height:100%;max-width:430px;object-fit:cover;z-index:0"/>
-    <div style="position:absolute;inset:0;background:rgba(13,31,61,.45);z-index:1"></div>
-    <div style="position:relative;z-index:2;padding-top:56px;text-align:center">
+    <div style="padding-top:56px">
       <div style="font-size:12px;letter-spacing:3px;color:var(--gold-l);font-weight:600">국제라이온스협회 355-A(부산)지구</div>
       <div style="width:36px;height:1px;background:var(--gold);margin:12px auto 0;opacity:.7"></div>
     </div>
-    <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center">
-      <div style="margin-top:28px;text-align:center">
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <img src="photo/lions_logo_transparent.png" style="width:160px;height:160px;object-fit:contain;margin:0 auto 16px;display:block" onerror="this.style.display='none'">
+      <div style="text-align:center">
         <h1 style="font-size:30px;font-weight:800;letter-spacing:1px">부산라이온스클럽</h1>
         <div style="font-size:13px;letter-spacing:4px;color:var(--gold-l);margin-top:10px;font-weight:500">BUSAN LIONS CLUB</div>
       </div>
@@ -125,7 +124,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
         <span style="font-size:15px;color:#fff;font-weight:700">2024 – 2025</span>
       </div>
     </div>
-    <div style="position:relative;z-index:2;width:100%;padding:0 28px 44px">
+    <div style="width:100%;padding:0 28px 44px">
       <div style="font-size:14px;letter-spacing:7px;color:var(--gold-l);margin-bottom:24px;font-weight:500;text-align:center">WE&nbsp;&nbsp;SERVE</div>
       <button class="btn-primary btn-gold" onclick="startApp()" style="font-size:18px">
         회원수첩 펼치기
