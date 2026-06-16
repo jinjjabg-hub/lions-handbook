@@ -733,11 +733,68 @@ function renderExec(el) {
 
 function showOrgChart() {
   const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.95);display:flex;align-items:center;justify-content:center;touch-action:pinch-zoom';
-  ov.onclick = function(e){ if(e.target===ov) document.body.removeChild(ov); };
-  ov.innerHTML = `
-    <button onclick="this.closest('div').parentNode && document.body.removeChild(this.closest('div'))" style="position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1">✕</button>
-    <img src="photo/org_chart.png" style="max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom"/>`;
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.95);overflow:hidden;display:flex;align-items:center;justify-content:center';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:20px;cursor:pointer;z-index:1;display:flex;align-items:center;justify-content:center';
+  closeBtn.onclick = () => document.body.removeChild(ov);
+
+  const img = document.createElement('img');
+  img.src = 'photo/org_chart.png';
+  img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;transform-origin:center center;will-change:transform;user-select:none';
+
+  let scale = 1, tx = 0, ty = 0;
+  let lastScale = 1, lastTx = 0, lastTy = 0;
+  let startDist = 0, startScale = 1;
+  let startX = 0, startY = 0;
+  let lastTap = 0;
+
+  function applyTransform() {
+    img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  }
+
+  img.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        scale = scale > 1 ? 1 : 2;
+        tx = 0; ty = 0;
+        applyTransform();
+        lastTap = 0; return;
+      }
+      lastTap = now;
+      startX = e.touches[0].clientX - tx;
+      startY = e.touches[0].clientY - ty;
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      startDist = Math.hypot(dx, dy);
+      startScale = scale;
+      lastTx = tx; lastTy = ty;
+    }
+  }, {passive:false});
+
+  img.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (e.touches.length === 1 && scale > 1) {
+      tx = e.touches[0].clientX - startX;
+      ty = e.touches[0].clientY - startY;
+      applyTransform();
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      scale = Math.min(Math.max(startScale * dist / startDist, 0.5), 6);
+      applyTransform();
+    }
+  }, {passive:false});
+
+  ov.addEventListener('click', function(e) { if (e.target === ov) document.body.removeChild(ov); });
+
+  ov.appendChild(closeBtn);
+  ov.appendChild(img);
   document.body.appendChild(ov);
 }
 
