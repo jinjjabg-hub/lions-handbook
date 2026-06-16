@@ -1854,6 +1854,33 @@ function showSpouseCard(spouseName, memberId) {
   </div>`;
 }
 
+// ===== 안드로이드 뒤로가기 =====
+(function() {
+  let backPressTime = 0;
+  history.pushState(null, '', location.href);
+
+  window.addEventListener('popstate', function() {
+    var screens = document.getElementById('screens');
+    var overlays = screens ? screens.querySelectorAll('.screen') : [];
+
+    if (overlays.length > 1) {
+      overlays[overlays.length - 1].remove();
+      history.pushState(null, '', location.href);
+    } else if (typeof currentTab !== 'undefined' && currentTab !== 'home') {
+      showTab('home');
+      history.pushState(null, '', location.href);
+    } else {
+      var now = Date.now();
+      if (now - backPressTime < 2000) {
+        return;
+      }
+      backPressTime = now;
+      showToast('한 번 더 누르면 종료됩니다');
+      history.pushState(null, '', location.href);
+    }
+  });
+})();
+
 </script>
 </body>
 </html>
