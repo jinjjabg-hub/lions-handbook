@@ -313,13 +313,20 @@ const ADMIN_BIRTHS = ['19620304', '19730805', '19840226'];
 if (window._savedUser) {
   currentUser = window._savedUser;
   isAdmin = ADMIN_BIRTHS.includes(currentUser.birth);
-  // 메인 열린 상태에서 탭 초기화 (DOMContentLoaded 이후 실행됨)
-  document.addEventListener('DOMContentLoaded', function() {
-    if (document.getElementById('main').style.display === 'flex') {
+
+  function _restoreHome() {
+    if (document.getElementById('main') && document.getElementById('main').style.display === 'flex') {
       if (isAdmin) initFirestore().catch(()=>{});
       showTab('home');
     }
-  });
+  }
+
+  // DOMContentLoaded가 이미 지났으면 즉시 실행, 아니면 이벤트 대기
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _restoreHome);
+  } else {
+    _restoreHome();
+  }
 }
 
 function checkSession() {
@@ -538,7 +545,7 @@ async function tryLogin() {
   const email = birth + '@lions.kr';
 
   function setUser(name, id) {
-    currentUser = { birth, name, id, pw };
+    currentUser = { birth, name, id };
     isAdmin = ADMIN_BIRTHS.includes(birth);
     localStorage.setItem('lions_user', JSON.stringify(currentUser));
   }
@@ -634,36 +641,11 @@ async function initFirestore() {
   } catch(e) { console.warn('initFirestore:', e); }
 }
 
-async function ensureFirebaseAuth() {
-  if (auth.currentUser) return true;
-  // Firebase Auth 세션 만료 → localStorage에서 자동 재로그인 시도
-  try {
-    const saved = localStorage.getItem('lions_user');
-    if (!saved) return false;
-    const u = JSON.parse(saved);
-    if (!u || !u.birth || !u.pw) return false;
-    await auth.signInWithEmailAndPassword(u.birth + '@lions.kr', u.pw);
-    return !!auth.currentUser;
-  } catch(e) { return false; }
-}
-
 async function saveNotice() {
   const title = (document.getElementById('notice-title')||{}).value?.trim();
   const content = (document.getElementById('notice-content')||{}).value?.trim();
   if (!title || !content) { showToast('제목과 내용을 입력해주세요'); return; }
   const btn = document.querySelector('[onclick="saveNotice()"]');
-
-  // Firebase Auth 세션 확인 → 만료 시 자동 재로그인
-  if (!auth.currentUser) {
-    showToast('세션 확인 중...');
-    const ok = await ensureFirebaseAuth();
-    if (!ok) {
-      showToast('세션이 만료됐어요. 다시 로그인해주세요.');
-      setTimeout(() => { localStorage.removeItem('lions_user'); location.reload(); }, 1500);
-      return;
-    }
-  }
-
   if (btn) { btn.disabled = true; btn.textContent = '등록 중...'; }
   try {
     await db.collection('notices').add({
