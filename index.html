@@ -329,7 +329,8 @@ if (window._savedUser) {
   function _restoreHome() {
     if (document.getElementById('main') && document.getElementById('main').style.display === 'flex') {
       if (isAdmin) initFirestore().catch(()=>{});
-      showTab('home');
+      // showTab이 정의된 후 실행되도록 setTimeout 사용
+      setTimeout(function() { showTab('home'); }, 0);
     }
   }
 
