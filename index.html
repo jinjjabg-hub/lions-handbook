@@ -543,17 +543,28 @@ async function saveGalleryEntry() {
   if (!title) { showToast('행사명을 입력해주세요'); return; }
   const btn = document.getElementById('gallery-save-btn');
   if (btn) { btn.disabled = true; btn.textContent = '등록 중...'; }
-  let thumbUrl = '';
+  let url = '';
   try {
     const fileInput = document.getElementById('gallery-file');
     if (fileInput && fileInput.files.length > 0) {
       const file = fileInput.files[0];
-      const ref = storage.ref('gallery/' + Date.now() + '_' + file.name);
-      const snap = await ref.put(file);
-      thumbUrl = await snap.ref.getDownloadURL();
+      const storageRef = storage.ref('gallery/' + Date.now() + '_' + file.name);
+      const task = storageRef.put(file);
+      const progressWrap = document.getElementById('gallery-progress-wrap');
+      const progressBar = document.getElementById('gallery-progress-bar');
+      const progressText = document.getElementById('gallery-progress-text');
+      if (progressWrap) progressWrap.style.display = 'block';
+      task.on('state_changed', snapshot => {
+        const pct = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (progressText) progressText.textContent = pct + '%';
+        if (btn) btn.textContent = '업로드 중... ' + pct + '%';
+      });
+      const snap = await task;
+      url = await snap.ref.getDownloadURL();
     }
     await db.collection('gallery').add({
-      title, date, desc, thumb: thumbUrl,
+      title, date, desc, url, thumb: url,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     showToast('갤러리에 등록됐습니다');
@@ -1702,7 +1713,8 @@ const GALLERY = [
 ];
 
 function galleryThumb(g) {
-  if (g.thumb) return `<img src="${g.thumb}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/>`;
+  const src = g.url || g.thumb;
+  if (src) return `<img src="${src}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/>`;
   return `<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="rgba(255,255,255,.4)"/><path d="M21 15l-5-5L5 21" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 }
 
@@ -1762,7 +1774,7 @@ function showGalleryDetail(id) {
   </div>
   <div class="scroll" style="padding:20px">
     <div style="background:linear-gradient(135deg,#1c3e72,#0e2140);border-radius:14px;height:200px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;overflow:hidden">
-      ${g.thumb ? `<img src="${g.thumb}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="text-align:center;color:rgba(255,255,255,.5)"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><div style="font-size:13px;margin-top:8px">사진 없음</div></div>`}
+      ${(g.url||g.thumb) ? `<img src="${g.url||g.thumb}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="text-align:center;color:rgba(255,255,255,.5)"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><div style="font-size:13px;margin-top:8px">사진 없음</div></div>`}
     </div>
     <div style="font-size:18px;font-weight:800;color:var(--ink);margin-bottom:6px">${g.title}</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${g.date||''}</div>
@@ -2088,9 +2100,18 @@ function showAdminAddGallery() {
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">사진 선택</label>
       <label style="display:block;border:2px dashed var(--line);border-radius:12px;padding:30px;text-align:center;cursor:pointer;color:var(--muted)">
         <div style="font-size:32px;margin-bottom:8px">📷</div>
-        <div style="font-size:14px">사진을 선택하거나 여기에 끌어다 놓으세요</div>
-        <input id="gallery-file" type="file" accept="image/*" style="display:none"/>
+        <div id="gallery-file-label" style="font-size:14px">사진을 선택하거나 여기에 끌어다 놓으세요</div>
+        <input id="gallery-file" type="file" accept="image/*" style="display:none" onchange="(function(f){if(!f)return;document.getElementById('gallery-file-label').textContent=f.name;var r=new FileReader();r.onload=function(e){var p=document.getElementById('gallery-preview');var i=document.getElementById('gallery-preview-img');if(p&&i){i.src=e.target.result;p.style.display='block'}};r.readAsDataURL(f)})(this.files[0])"/>
       </label>
+      <div id="gallery-preview" style="display:none;margin-top:10px;border-radius:10px;overflow:hidden;height:160px;background:var(--line)">
+        <img id="gallery-preview-img" style="width:100%;height:100%;object-fit:cover"/>
+      </div>
+      <div id="gallery-progress-wrap" style="display:none;margin-top:10px">
+        <div style="background:var(--line);border-radius:99px;height:8px;overflow:hidden">
+          <div id="gallery-progress-bar" style="height:100%;background:var(--navy);border-radius:99px;width:0%;transition:width .2s"></div>
+        </div>
+        <div id="gallery-progress-text" style="font-size:12px;color:var(--muted);text-align:right;margin-top:4px">0%</div>
+      </div>
     </div>
     <div style="margin-bottom:14px">
       <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">설명</label>
