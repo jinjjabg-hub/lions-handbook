@@ -325,6 +325,116 @@ function doLogin(birth, phone4) {
   return null;
 }
 
+function showMyInfo() {
+  const screens = document.getElementById('screens');
+  const div = document.createElement('div');
+  div.className = 'screen';
+  div.style.cssText = 'position:absolute;inset:0;z-index:15;display:flex;flex-direction:column';
+  screens.appendChild(div);
+  const m = currentUser ? MEMBERS_CLEAN.find(x => x.id === currentUser.id) : null;
+  div.innerHTML = `
+  <div class="appbar">
+    <button class="appbar-back" onclick="this.closest('.screen').remove()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 5l-7 7 7 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="appbar-title">내 정보</div>
+  </div>
+  <div class="scroll" style="padding-bottom:30px">
+    <div style="padding:20px 16px 10px;display:flex;align-items:center;gap:14px">
+      ${avatar(currentUser ? currentUser.name : '', false, 56, currentUser ? currentUser.id : 0)}
+      <div>
+        <div style="font-size:20px;font-weight:800;color:var(--ink)">${currentUser ? currentUser.name : ''} L</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px">${m ? (m.role||'') : ''}</div>
+      </div>
+    </div>
+    <div class="section-label">설정</div>
+    <div class="card">
+      <div class="row" onclick="showChangePassword()" style="cursor:pointer">
+        <div style="font-size:20px;margin-right:4px">🔐</div>
+        <div style="flex:1"><div class="row-val">비밀번호 변경</div><div class="row-label">현재 비밀번호 확인 후 변경</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+    <div class="section-label">계정</div>
+    <div class="card">
+      <div class="row" onclick="doLogout()" style="cursor:pointer">
+        <div style="font-size:20px;margin-right:4px">🚪</div>
+        <div style="flex:1"><div class="row-val" style="color:#e44">로그아웃</div></div>
+      </div>
+    </div>
+    <div style="margin:16px;padding:12px 14px;background:var(--paper-d);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.7">
+      초기 비밀번호는 <b style="color:var(--ink)">전화번호 끝 4자리</b>입니다.
+    </div>
+  </div>`;
+}
+
+function showChangePassword() {
+  const screens = document.getElementById('screens');
+  const div = document.createElement('div');
+  div.className = 'screen';
+  div.style.cssText = 'position:absolute;inset:0;z-index:16;display:flex;flex-direction:column';
+  screens.appendChild(div);
+  div.innerHTML = `
+  <div class="appbar">
+    <button class="appbar-back" onclick="this.closest('.screen').remove()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 5l-7 7 7 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="appbar-title">비밀번호 변경</div>
+  </div>
+  <div class="scroll" style="padding:16px;padding-bottom:30px">
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">현재 비밀번호</label>
+      <input id="pw-current" type="tel" maxlength="20" placeholder="현재 비밀번호 입력"
+        style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"/>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">새 비밀번호 (4자리 이상)</label>
+      <input id="pw-new" type="tel" maxlength="20" placeholder="새 비밀번호 입력"
+        style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"/>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">새 비밀번호 확인</label>
+      <input id="pw-confirm" type="tel" maxlength="20" placeholder="새 비밀번호 재입력"
+        style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--card);color:var(--ink);outline:none"
+        onkeydown="if(event.key==='Enter')changePassword()"/>
+    </div>
+    <div id="pw-err" style="text-align:center;color:#e44;font-size:13px;margin-bottom:12px;display:none"></div>
+    <button id="pw-save-btn" onclick="changePassword()" class="btn-primary">변경하기</button>
+  </div>`;
+}
+
+async function changePassword() {
+  const current = (document.getElementById('pw-current')||{}).value?.trim()||'';
+  const newPw = (document.getElementById('pw-new')||{}).value?.trim()||'';
+  const confirm = (document.getElementById('pw-confirm')||{}).value?.trim()||'';
+  const errEl = document.getElementById('pw-err');
+  const btn = document.getElementById('pw-save-btn');
+  function showErr(msg) {
+    if (errEl) { errEl.style.display='block'; errEl.textContent=msg; }
+    if (btn) { btn.disabled=false; btn.textContent='변경하기'; }
+  }
+  if (!current || !newPw || !confirm) { showErr('모든 항목을 입력해주세요'); return; }
+  if (newPw.length < 4) { showErr('새 비밀번호는 4자리 이상이어야 합니다'); return; }
+  if (newPw !== confirm) { showErr('새 비밀번호가 일치하지 않습니다'); return; }
+  if (errEl) errEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = '변경 중...'; }
+  try {
+    const user = auth.currentUser;
+    if (!user) { showErr('로그인 상태를 확인해주세요'); return; }
+    const credential = firebase.auth.EmailAuthProvider.credential(user.email, current);
+    await user.reauthenticateWithCredential(credential);
+    await user.updatePassword(newPw);
+    showToast('비밀번호가 변경됐습니다');
+    setTimeout(() => {
+      const ss = document.querySelectorAll('#screens .screen');
+      if (ss.length > 0) ss[ss.length-1].remove();
+    }, 800);
+  } catch(e) {
+    const isAuthErr = ['auth/wrong-password','auth/invalid-credential','auth/invalid-login-credentials'].includes(e.code);
+    showErr(isAuthErr ? '현재 비밀번호가 맞지 않습니다' : (e.message||'변경에 실패했습니다'));
+  }
+}
+
 function doLogout() {
   auth.signOut().catch(()=>{});
   Object.values(_unsubs).forEach(f => f && f());
@@ -365,7 +475,8 @@ function showLoginScreen() {
         생년월일 또는 전화번호가 맞지 않습니다
       </div>
     </div>
-    <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.3);text-align:center">
+    <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.4);text-align:center;line-height:1.8">
+      초기 비밀번호: <b style="color:rgba(247,230,173,.7)">전화번호 끝 4자리</b><br>
       로그인 정보는 사무장에게 문의하세요
     </div>
   </div>`;
@@ -708,6 +819,7 @@ function renderHome(el) {
       <div class="appbar-title">부산라이온스클럽</div>
       <div class="appbar-sub">제65대 · 2024 – 2025 ${userName?'· '+userName+' L':''}</div>
     </div>
+    <button onclick="showMyInfo()" style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:6px 10px;color:#fff;font-size:12px;cursor:pointer;margin-right:6px">내 정보</button>
     <button onclick="doLogout()" style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:6px 10px;color:#fff;font-size:12px;cursor:pointer">로그아웃</button>
   </div>
   <div class="scroll" style="padding-bottom:24px">
