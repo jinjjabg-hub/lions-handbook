@@ -674,16 +674,6 @@ async function saveNotice() {
   const content = (document.getElementById('notice-content')||{}).value?.trim();
   if (!title || !content) { showToast('제목과 내용을 입력해주세요'); return; }
   const btn = document.querySelector('[onclick="saveNotice()"]');
-
-  // Firebase Auth 세션 복원 완료까지 대기
-  const firebaseUser = await waitForAuth();
-
-  if (!firebaseUser) {
-    showToast('세션이 만료됐어요. 다시 로그인해주세요.');
-    setTimeout(() => { localStorage.removeItem('lions_user'); location.reload(); }, 1500);
-    return;
-  }
-
   if (btn) { btn.disabled = true; btn.textContent = '등록 중...'; }
   try {
     await db.collection('notices').add({
