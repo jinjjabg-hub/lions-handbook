@@ -173,6 +173,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
         회원수첩 펼치기
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
+      <button onclick="startGuest()" style="width:100%;margin-top:12px;padding:13px;background:transparent;border:1.5px solid rgba(240,192,64,.4);border-radius:14px;color:rgba(247,230,173,.7);font-size:15px;font-weight:600;cursor:pointer;letter-spacing:1px">
+        게스트로 둘러보기
+      </button>
       <div style="font-size:11px;color:rgba(247,230,173,.5);margin-top:14px;text-align:center;letter-spacing:1px">No. 025769 · 조직총회 1960. 6. 18</div>
     </div>
   </div>
@@ -823,6 +826,16 @@ let currentTab = 'home';
 
 
 let _authListenerSet = false;
+let isGuest = false;
+
+function startGuest() {
+  document.getElementById('cover').style.display = 'none';
+  isGuest = true;
+  currentUser = { name: '게스트', birth: '', id: '' };
+  isAdmin = false;
+  document.getElementById('main').style.display = 'flex';
+  showTab('home');
+}
 function startApp() {
   document.getElementById('cover').style.display = 'none';
   if (_authListenerSet) return;
@@ -898,6 +911,12 @@ function openApp() {
 }
 
 function showTab(tab) {
+  // 게스트 접근 제한
+  const guestAllowed = ['home', 'members', 'rules', 'history'];
+  if (isGuest && !guestAllowed.includes(tab)) {
+    showToast('회원 로그인 후 이용 가능합니다');
+    return;
+  }
   currentTab = tab;
   Object.keys(_unsubs).forEach(k => { if (_unsubs[k]) { _unsubs[k](); _unsubs[k]=null; } });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -937,8 +956,11 @@ function renderHome(el) {
       <div class="appbar-title">부산라이온스클럽</div>
       <div class="appbar-sub">제65대 · 2024 – 2025 ${userName?'· '+userName+' L':''}</div>
     </div>
-    <button onclick="showMyInfo()" style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:6px 10px;color:#fff;font-size:12px;cursor:pointer;margin-right:6px">내 정보</button>
-    <button onclick="doLogout()" style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:6px 10px;color:#fff;font-size:12px;cursor:pointer">로그아웃</button>
+    ${isGuest
+      ? `<button onclick="doLogout()" style="background:var(--gold);border:none;border-radius:10px;padding:6px 12px;color:var(--navy-d);font-size:12px;font-weight:700;cursor:pointer">로그인</button>`
+      : `<button onclick="showMyInfo()" style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:6px 10px;color:#fff;font-size:12px;cursor:pointer;margin-right:6px">내 정보</button>
+    <button onclick="doLogout()" style="background:rgba(255,255,255,.15);border:none;border-radius:10px;padding:6px 10px;color:#fff;font-size:12px;cursor:pointer">로그아웃</button>`
+    }
   </div>
   <div class="scroll" style="padding-bottom:24px">
     <div style="display:flex;align-items:center;justify-content:center;padding:24px 0">
@@ -1155,7 +1177,7 @@ function renderMemberCard(el, m) {
         ${avatar(m.spouse, false, 36, 'spouse_'+m.id)}
       </div>`:''}
       ${m.coAddr?`<div class="row" style="padding:10px 0;border-bottom:1px solid var(--line);display:flex;align-items:center"><div style="flex:1"><div class="row-label">근무처 주소</div><div class="row-val">${m.coAddr}</div></div><a href="https://map.kakao.com/?q=${encodeURIComponent(m.coAddr)}" target="_blank" style="flex-shrink:0;width:36px;height:36px;border-radius:10px;background:var(--gold);display:flex;align-items:center;justify-content:center;text-decoration:none;margin-left:8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="var(--navy-d)"/></svg></a></div>`:''}
-      ${m.f?`<div class="row" style="padding:10px 0" onclick="window.location.href='tel:${m.f.replace(/[^0-9]/g,'')}'" style="cursor:pointer">
+      ${m.f && !isGuest ?`<div class="row" style="padding:10px 0" onclick="window.location.href='tel:${m.f.replace(/[^0-9]/g,'')}'" style="cursor:pointer">
         <div style="flex:1"><div class="row-label">휴대폰</div><div class="row-val" style="color:var(--navy);font-size:18px;font-weight:700">${m.f}</div></div>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 4h3l1.6 4.2-2 1.4a12 12 0 005.8 5.8l1.4-2L19 17v3a1 1 0 01-1 1A15 15 0 014 6a1 1 0 011-1z" fill="var(--navy)"/></svg>
       </div>`:''}
@@ -1163,7 +1185,7 @@ function renderMemberCard(el, m) {
 
     <div style="padding:16px">
       ${dica?`<button onclick="showToast('DiCA 명함으로 이동합니다')" class="btn-primary btn-gold" style="margin-bottom:10px">디지털 명함 보기 →</button>`:''}
-      ${m.f?`<button onclick="window.location.href='tel:${m.f.replace(/[^0-9]/g,'')}'" class="btn-primary" style="${dica?'':''}">📞 전화 연결</button>`:''}
+      ${m.f && !isGuest ?`<button onclick="window.location.href='tel:${m.f.replace(/[^0-9]/g,'')}'" class="btn-primary" style="${dica?'':''}">📞 전화 연결</button>`:''}
     </div>
   </div>`;
 }
