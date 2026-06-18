@@ -196,6 +196,43 @@ const storage = firebase.storage();
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
 const _unsubs = {};
 
+// 앱 로드 시 Firebase 세션 자동 확인 → 로그인 유지
+(function autoRestoreSession() {
+  auth.onAuthStateChanged(async function(firebaseUser) {
+    if (document.getElementById('main') && document.getElementById('main').style.display === 'flex') return;
+    if (window._startAppCalled) return;
+    if (!firebaseUser) return;
+    const birth = (firebaseUser.email || '').split('@')[0];
+    if (!birth || birth.length !== 8 || !/^\d{8}$/.test(birth)) return;
+    window._startAppCalled = true;
+    const cover = document.getElementById('cover');
+    if (cover) cover.style.display = 'none';
+    const saved = localStorage.getItem('lions_user');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.birth === birth) {
+          currentUser = parsed;
+          isAdmin = ADMIN_BIRTHS.includes(birth);
+          document.getElementById('main').style.display = 'flex';
+          if (isAdmin) initFirestore().catch(()=>{});
+          showTab('home');
+          return;
+        }
+      } catch(e) {}
+    }
+    const localM = MEMBERS_CLEAN.find(m => parseBirth(m.b) === birth);
+    if (localM) {
+      currentUser = { birth, name: localM.name, id: localM.id };
+      isAdmin = ADMIN_BIRTHS.includes(birth);
+      localStorage.setItem('lions_user', JSON.stringify(currentUser));
+      document.getElementById('main').style.display = 'flex';
+      if (isAdmin) initFirestore().catch(()=>{});
+      showTab('home');
+    }
+  });
+})();
+
 // ===== 데이터 =====
 const CLUB = {
   name:'부산라이온스클럽', en:'BUSAN LIONS CLUB', district:'국제라이온스협회 355-A(부산)지구',
