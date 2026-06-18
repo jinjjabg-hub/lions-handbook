@@ -109,6 +109,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 </head>
 <body>
+<!-- 로그인 유지: localStorage 즉시 확인 (동기, 비동기 없음) -->
+<script>
+(function() {
+  try {
+    const saved = localStorage.getItem('lions_user');
+    if (saved) {
+      const u = JSON.parse(saved);
+      if (u && u.birth && u.name) {
+        // 저장된 로그인 정보 있음 → 커버 숨기고 메인 바로 열기
+        document.addEventListener('DOMContentLoaded', function() {
+          var cover = document.getElementById('cover');
+          var main = document.getElementById('main');
+          if (cover) cover.style.display = 'none';
+          if (main) {
+            main.style.display = 'flex';
+            // currentUser, isAdmin은 데이터 로드 후 설정되므로 window에 임시 저장
+            window._savedUser = u;
+          }
+        });
+      }
+    }
+  } catch(e) {}
+})();
+</script>
 <div id="app"><div id="login-screen" style="display:none;position:fixed;inset:0;z-index:9999;background:#0d1f3d"></div>
 
   <!-- 표지 -->
@@ -195,43 +219,6 @@ const db = firebase.firestore();
 const storage = firebase.storage();
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
 const _unsubs = {};
-
-// 앱 로드 시 Firebase 세션 자동 확인 → 로그인 유지
-(function autoRestoreSession() {
-  auth.onAuthStateChanged(async function(firebaseUser) {
-    if (document.getElementById('main') && document.getElementById('main').style.display === 'flex') return;
-    if (window._startAppCalled) return;
-    if (!firebaseUser) return;
-    const birth = (firebaseUser.email || '').split('@')[0];
-    if (!birth || birth.length !== 8 || !/^\d{8}$/.test(birth)) return;
-    window._startAppCalled = true;
-    const cover = document.getElementById('cover');
-    if (cover) cover.style.display = 'none';
-    const saved = localStorage.getItem('lions_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.birth === birth) {
-          currentUser = parsed;
-          isAdmin = ADMIN_BIRTHS.includes(birth);
-          document.getElementById('main').style.display = 'flex';
-          if (isAdmin) initFirestore().catch(()=>{});
-          showTab('home');
-          return;
-        }
-      } catch(e) {}
-    }
-    const localM = MEMBERS_CLEAN.find(m => parseBirth(m.b) === birth);
-    if (localM) {
-      currentUser = { birth, name: localM.name, id: localM.id };
-      isAdmin = ADMIN_BIRTHS.includes(birth);
-      localStorage.setItem('lions_user', JSON.stringify(currentUser));
-      document.getElementById('main').style.display = 'flex';
-      if (isAdmin) initFirestore().catch(()=>{});
-      showTab('home');
-    }
-  });
-})();
 
 // ===== 데이터 =====
 const CLUB = {
@@ -321,6 +308,19 @@ let isAdmin = false;
 
 // 관리자 생년월일 목록 (허광탁, 김근우, 박성민)
 const ADMIN_BIRTHS = ['19620304', '19730805', '19840226'];
+
+// 로그인 유지: body 최상단에서 감지한 _savedUser를 currentUser로 복원
+if (window._savedUser) {
+  currentUser = window._savedUser;
+  isAdmin = ADMIN_BIRTHS.includes(currentUser.birth);
+  // 메인 열린 상태에서 탭 초기화 (DOMContentLoaded 이후 실행됨)
+  document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('main').style.display === 'flex') {
+      if (isAdmin) initFirestore().catch(()=>{});
+      showTab('home');
+    }
+  });
+}
 
 function checkSession() {
   const saved = localStorage.getItem('lions_user');
@@ -794,8 +794,6 @@ function startApp() {
 
   auth.onAuthStateChanged(async function(firebaseUser) {
     if (document.getElementById('main').style.display === 'flex') return;
-    if (window._startAppCalled) return;
-    window._startAppCalled = true;
 
     if (!firebaseUser) {
       showLoginScreen();
