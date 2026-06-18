@@ -838,7 +838,9 @@ function startApp() {
   _authListenerSet = true;
 
   auth.onAuthStateChanged(async function(firebaseUser) {
+    // 메인 화면이 이미 열려있으면 절대 건드리지 않음 (로그인 유지 보호)
     if (document.getElementById('main').style.display === 'flex') return;
+    if (window._savedUser) return;
 
     if (!firebaseUser) {
       showLoginScreen();
