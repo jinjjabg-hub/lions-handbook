@@ -196,6 +196,73 @@ const storage = firebase.storage();
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
 const _unsubs = {};
 
+// ===== 앱 시작 시 자동 로그인 유지 처리 =====
+// Firebase가 이전 세션을 기억하고 있으면 커버/로그인 건너뛰고 바로 메인으로
+(function autoRestoreSession() {
+  auth.onAuthStateChanged(async function(firebaseUser) {
+    // 이미 메인 화면이 열려 있으면 무시
+    if (document.getElementById('main') && document.getElementById('main').style.display === 'flex') return;
+    // 커버 버튼 클릭으로 startApp()이 이미 실행 중이면 무시 (중복 방지)
+    if (window._startAppCalled) return;
+
+    if (!firebaseUser) return; // 로그인 안 된 상태 → 커버 화면 그대로 유지
+
+    // Firebase 세션 살아있음 → 자동 복원
+    const birth = (firebaseUser.email || '').split('@')[0];
+    if (!birth || birth.length !== 8 || !/^\d{8}$/.test(birth)) return;
+
+    // 커버 숨기기
+    const cover = document.getElementById('cover');
+    if (cover) cover.style.display = 'none';
+
+    // 1순위: localStorage 빠른 복원
+    const saved = localStorage.getItem('lions_user');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.birth === birth) {
+          currentUser = parsed;
+          isAdmin = ADMIN_BIRTHS.includes(birth);
+          document.getElementById('main').style.display = 'flex';
+          if (isAdmin) initFirestore().catch(()=>{});
+          showTab('home');
+          window._startAppCalled = true;
+          return;
+        }
+      } catch(e) {}
+    }
+
+    // 2순위: MEMBERS_CLEAN 로컬 배열에서 복원
+    const localM = MEMBERS_CLEAN.find(m => parseBirth(m.b) === birth);
+    if (localM) {
+      currentUser = { birth, name: localM.name, id: localM.id };
+      isAdmin = ADMIN_BIRTHS.includes(birth);
+      localStorage.setItem('lions_user', JSON.stringify(currentUser));
+      document.getElementById('main').style.display = 'flex';
+      if (isAdmin) initFirestore().catch(()=>{});
+      showTab('home');
+      window._startAppCalled = true;
+      return;
+    }
+
+    // 3순위: Firestore에서 복원
+    try {
+      const snap = await db.collection('members').doc(birth).get();
+      if (snap.exists) {
+        const d = snap.data();
+        if (d.status === '탈퇴') { await auth.signOut().catch(()=>{}); return; }
+        currentUser = { birth, name: d.name || birth, id: d.id || birth };
+        isAdmin = ADMIN_BIRTHS.includes(birth);
+        localStorage.setItem('lions_user', JSON.stringify(currentUser));
+        document.getElementById('main').style.display = 'flex';
+        if (isAdmin) initFirestore().catch(()=>{});
+        showTab('home');
+        window._startAppCalled = true;
+      }
+    } catch(e) {}
+  });
+})();
+
 // ===== 데이터 =====
 const CLUB = {
   name:'부산라이온스클럽', en:'BUSAN LIONS CLUB', district:'국제라이온스협회 355-A(부산)지구',
@@ -752,6 +819,10 @@ let currentTab = 'home';
 let _authListenerSet = false;
 function startApp() {
   document.getElementById('cover').style.display = 'none';
+  // 자동 세션 복원으로 이미 메인이 열렸으면 그냥 종료
+  if (window._startAppCalled) return;
+  if (document.getElementById('main').style.display === 'flex') return;
+  window._startAppCalled = true;
   if (_authListenerSet) return;
   _authListenerSet = true;
 
