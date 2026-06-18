@@ -193,6 +193,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
 const _unsubs = {};
 
 // ===== 데이터 =====
@@ -285,11 +286,13 @@ let isAdmin = false;
 const ADMIN_BIRTHS = ['19620304', '19730805', '19840226'];
 
 function checkSession() {
-  const saved = sessionStorage.getItem('lions_user');
+  const saved = localStorage.getItem('lions_user');
   if (saved) {
-    currentUser = JSON.parse(saved);
-    isAdmin = ADMIN_BIRTHS.includes(currentUser.birth);
-    return true;
+    try {
+      currentUser = JSON.parse(saved);
+      isAdmin = ADMIN_BIRTHS.includes(currentUser.birth);
+      return true;
+    } catch(e) {}
   }
   return false;
 }
@@ -316,7 +319,7 @@ function doLogin(birth, phone4) {
   if (member) {
     currentUser = {birth, name: member.name, id: member.id};
     isAdmin = ADMIN_BIRTHS.includes(birth);
-    sessionStorage.setItem('lions_user', JSON.stringify(currentUser));
+    localStorage.setItem('lions_user', JSON.stringify(currentUser));
     return member;
   }
   return null;
@@ -326,7 +329,7 @@ function doLogout() {
   auth.signOut().catch(()=>{});
   Object.values(_unsubs).forEach(f => f && f());
   currentUser = null; isAdmin = false;
-  sessionStorage.removeItem('lions_user');
+  localStorage.removeItem('lions_user');
   document.getElementById('main').style.display = 'none';
   showLoginScreen();
 }
@@ -389,7 +392,7 @@ async function tryLogin() {
   function setUser(name, id) {
     currentUser = { birth, name, id };
     isAdmin = ADMIN_BIRTHS.includes(birth);
-    sessionStorage.setItem('lions_user', JSON.stringify(currentUser));
+    localStorage.setItem('lions_user', JSON.stringify(currentUser));
   }
 
   function loginFailed(msg) {
@@ -608,15 +611,29 @@ function avatar(name, gold=false, size=48, id=null) {
 let currentTab = 'home';
 
 
+let _authListenerSet = false;
 function startApp() {
   document.getElementById('cover').style.display = 'none';
-  if (checkSession()) {
-    document.getElementById('main').style.display = 'flex';
-    if (isAdmin) initFirestore().catch(()=>{});
-    showTab('home');
-  } else {
-    showLoginScreen();
+  if (_authListenerSet) {
+    if (checkSession()) {
+      document.getElementById('main').style.display = 'flex';
+      if (isAdmin) initFirestore().catch(()=>{});
+      showTab('home');
+    } else {
+      showLoginScreen();
+    }
+    return;
   }
+  _authListenerSet = true;
+  auth.onAuthStateChanged(function(firebaseUser) {
+    if (firebaseUser && checkSession()) {
+      document.getElementById('main').style.display = 'flex';
+      if (isAdmin) initFirestore().catch(()=>{});
+      showTab('home');
+    } else {
+      showLoginScreen();
+    }
+  });
 }
 function openApp() {
   const main = document.getElementById('main');
