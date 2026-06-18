@@ -490,6 +490,8 @@ async function saveNotice() {
   const title = (document.getElementById('notice-title')||{}).value?.trim();
   const content = (document.getElementById('notice-content')||{}).value?.trim();
   if (!title || !content) { showToast('제목과 내용을 입력해주세요'); return; }
+  const btn = document.querySelector('[onclick="saveNotice()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '등록 중...'; }
   try {
     await db.collection('notices').add({
       title, content, author: currentUser ? currentUser.name : '',
@@ -498,7 +500,10 @@ async function saveNotice() {
     });
     showToast('공지사항이 등록됐습니다');
     setTimeout(() => { const ss = document.querySelectorAll('#screens .screen'); if (ss.length>1) ss[ss.length-1].remove(); }, 800);
-  } catch(e) { showToast('등록 실패: ' + e.message); }
+  } catch(e) {
+    showToast('등록 실패: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '등록하기'; }
+  }
 }
 
 async function saveNewMember() {
@@ -753,7 +758,28 @@ function renderHome(el) {
         <div><div class="row-label">355-A지구 총재 · ${CLUB.governor}</div><div class="row-val">${CLUB.governorTheme}</div></div>
       </div>
     </div>
+
+    <div class="section-label">최근 공지사항</div>
+    <div id="home-notices" style="margin:0 16px 18px">
+      ${NOTICES.slice(0,3).map(n=>`
+      <div onclick="showTab('news')" style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 16px;margin-bottom:8px;cursor:pointer">
+        <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.title}</div>
+        <div style="font-size:12px;color:var(--muted)">${n.date} · ${n.author||''}</div>
+      </div>`).join('')}
+    </div>
   </div>`;
+
+  _unsubs['home_notices'] = db.collection('notices').orderBy('createdAt','desc').limit(3).onSnapshot(snap => {
+    const el2 = document.getElementById('home-notices');
+    if (!el2) return;
+    const items = snap.empty ? NOTICES.slice(0,3) : snap.docs.map(d=>({...d.data(),id:d.id}));
+    el2.innerHTML = items.length ? items.map(n=>`
+      <div onclick="showTab('news')" style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 16px;margin-bottom:8px;cursor:pointer">
+        <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.title}</div>
+        <div style="font-size:12px;color:var(--muted)">${n.date||''} · ${n.author||''}</div>
+      </div>`).join('') :
+      '<div style="color:var(--muted);font-size:14px;text-align:center;padding:20px">등록된 공지사항이 없습니다</div>';
+  }, ()=>{});
 }
 
 // ===== 회원 명부 =====
