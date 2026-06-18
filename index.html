@@ -498,10 +498,12 @@ async function changePassword() {
 function doLogout() {
   auth.signOut().catch(()=>{});
   Object.values(_unsubs).forEach(f => f && f());
-  currentUser = null; isAdmin = false;
+  currentUser = null; isAdmin = false; isGuest = false;
   localStorage.removeItem('lions_user');
+  window._savedUser = null;
   document.getElementById('main').style.display = 'none';
-  showLoginScreen();
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('cover').style.display = 'flex';
 }
 
 function showLoginScreen() {
