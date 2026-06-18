@@ -117,17 +117,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
     if (saved) {
       const u = JSON.parse(saved);
       if (u && u.birth && u.name) {
-        // 저장된 로그인 정보 있음 → 커버 숨기고 메인 바로 열기
+        // UI 즉시 열기
         document.addEventListener('DOMContentLoaded', function() {
           var cover = document.getElementById('cover');
           var main = document.getElementById('main');
           if (cover) cover.style.display = 'none';
           if (main) {
             main.style.display = 'flex';
-            // currentUser, isAdmin은 데이터 로드 후 설정되므로 window에 임시 저장
             window._savedUser = u;
           }
         });
+        // Firebase Auth 백그라운드 자동 재로그인 (pw 있을 때만)
+        if (u.pw) {
+          window._autoReloginPromise = new Promise(function(resolve) {
+            document.addEventListener('DOMContentLoaded', function() {
+              // Firebase 초기화 완료 후 실행되도록 짧게 대기
+              setTimeout(function() {
+                if (typeof auth !== 'undefined') {
+                  if (auth.currentUser) { resolve(true); return; }
+                  auth.signInWithEmailAndPassword(u.birth + '@lions.kr', u.pw)
+                    .then(function() { resolve(true); })
+                    .catch(function() { resolve(false); });
+                } else {
+                  resolve(false);
+                }
+              }, 500);
+            });
+          });
+        }
       }
     }
   } catch(e) {}
@@ -545,7 +562,7 @@ async function tryLogin() {
   const email = birth + '@lions.kr';
 
   function setUser(name, id) {
-    currentUser = { birth, name, id };
+    currentUser = { birth, name, id, pw };
     isAdmin = ADMIN_BIRTHS.includes(birth);
     localStorage.setItem('lions_user', JSON.stringify(currentUser));
   }
@@ -646,6 +663,26 @@ async function saveNotice() {
   const content = (document.getElementById('notice-content')||{}).value?.trim();
   if (!title || !content) { showToast('제목과 내용을 입력해주세요'); return; }
   const btn = document.querySelector('[onclick="saveNotice()"]');
+
+  // Firebase Auth 세션 확인 → 없으면 자동 재로그인 대기
+  if (!auth.currentUser) {
+    if (window._autoReloginPromise) {
+      await window._autoReloginPromise;
+    }
+    // 그래도 없으면 직접 재로그인 시도
+    if (!auth.currentUser && currentUser && currentUser.pw) {
+      try {
+        await auth.signInWithEmailAndPassword(currentUser.birth + '@lions.kr', currentUser.pw);
+      } catch(e) {}
+    }
+  }
+
+  if (!auth.currentUser) {
+    showToast('세션이 만료됐어요. 다시 로그인해주세요.');
+    setTimeout(() => { localStorage.removeItem('lions_user'); location.reload(); }, 1500);
+    return;
+  }
+
   if (btn) { btn.disabled = true; btn.textContent = '등록 중...'; }
   try {
     await db.collection('notices').add({
