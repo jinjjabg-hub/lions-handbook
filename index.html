@@ -658,26 +658,27 @@ async function initFirestore() {
   } catch(e) { console.warn('initFirestore:', e); }
 }
 
+// Firebase Auth 세션 복원 완료까지 기다림
+function waitForAuth() {
+  return new Promise(function(resolve) {
+    if (auth.currentUser) { resolve(auth.currentUser); return; }
+    var unsubscribe = auth.onAuthStateChanged(function(user) {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+}
+
 async function saveNotice() {
   const title = (document.getElementById('notice-title')||{}).value?.trim();
   const content = (document.getElementById('notice-content')||{}).value?.trim();
   if (!title || !content) { showToast('제목과 내용을 입력해주세요'); return; }
   const btn = document.querySelector('[onclick="saveNotice()"]');
 
-  // Firebase Auth 세션 확인 → 없으면 자동 재로그인 대기
-  if (!auth.currentUser) {
-    if (window._autoReloginPromise) {
-      await window._autoReloginPromise;
-    }
-    // 그래도 없으면 직접 재로그인 시도
-    if (!auth.currentUser && currentUser && currentUser.pw) {
-      try {
-        await auth.signInWithEmailAndPassword(currentUser.birth + '@lions.kr', currentUser.pw);
-      } catch(e) {}
-    }
-  }
+  // Firebase Auth 세션 복원 완료까지 대기
+  const firebaseUser = await waitForAuth();
 
-  if (!auth.currentUser) {
+  if (!firebaseUser) {
     showToast('세션이 만료됐어요. 다시 로그인해주세요.');
     setTimeout(() => { localStorage.removeItem('lions_user'); location.reload(); }, 1500);
     return;
