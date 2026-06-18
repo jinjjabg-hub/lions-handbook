@@ -509,10 +509,16 @@ async function saveNewMember() {
   if (birth.length !== 8) { showToast('생년월일 형식을 확인해주세요 (예: 1990.1.1)'); return; }
   const btn = document.querySelector('[onclick="saveNewMember()"]');
   if (btn) { btn.disabled = true; btn.textContent = '등록 중...'; }
-  const newId = Math.max(...MEMBERS_CLEAN.map(m=>m.id), 0) + 1;
-  const member = { id: newId, name, role: g('new-role'), co: g('new-co'), coAddr: g('new-coAddr'),
-    f, b, spouse: g('new-spouse'), j: g('new-j'), bizImg: '', bizText: '', dicaUrl: '' };
   try {
+    const existing = await db.collection('members').doc(birth).get();
+    if (existing.exists) {
+      showToast('이미 등록된 생년월일입니다');
+      if (btn) { btn.disabled = false; btn.textContent = '등록하기'; }
+      return;
+    }
+    const newId = Math.max(...MEMBERS_CLEAN.map(m=>m.id), 0) + 1;
+    const member = { id: newId, name, role: g('new-role'), co: g('new-co'), coAddr: g('new-coAddr'),
+      f, b, spouse: g('new-spouse'), j: g('new-j'), bizImg: '', bizText: '', dicaUrl: '' };
     await db.collection('members').doc(birth).set({
       ...member, birth, status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -1859,7 +1865,7 @@ function showAdminEditMember(id) {
     <div class="appbar-title">${m.name} 수정</div>
   </div>
   <div class="scroll" style="padding:16px;padding-bottom:30px">
-    ${['name:이름', 'role:LC직책', 'co:직업/회사', 'coAddr:근무처 주소', 'f:휴대폰', 'b:생년월일', 'spouse:배우자'].map(field => {
+    ${['name:이름', 'role:LC직책', 'co:직업/회사', 'coAddr:근무처 주소', 'f:휴대폰', 'b:생년월일', 'j:입회년도', 'spouse:배우자'].map(field => {
       const [key, label] = field.split(':');
       return `
       <div style="margin-bottom:14px">
@@ -1890,7 +1896,7 @@ async function saveAdminEdit(id) {
   const g = k => (document.getElementById('edit-'+k+'-'+id)||{}).value?.trim()||'';
   const data = {
     name: g('name'), role: g('role'), co: g('co'), coAddr: g('coAddr'),
-    f: g('f'), b: g('b'), spouse: g('spouse'),
+    f: g('f'), b: g('b'), j: g('j'), spouse: g('spouse'),
     dicaUrl: g('dica'), bizImg: g('bizImg'), bizText: g('bizText'),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -1899,7 +1905,13 @@ async function saveAdminEdit(id) {
   const btn = document.querySelector('[onclick="saveAdminEdit('+id+')"]');
   if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
   try {
-    await db.collection('members').doc(birth).set(data, { merge: true });
+    const docRef = db.collection('members').doc(birth);
+    const snap = await docRef.get();
+    if (snap.exists) {
+      await docRef.update(data);
+    } else {
+      await docRef.set({ ...data, birth, status: 'active', id: m.id, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    }
     Object.assign(m, data);
     showToast('저장됐습니다');
     setTimeout(() => {
