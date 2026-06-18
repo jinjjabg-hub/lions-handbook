@@ -752,25 +752,69 @@ let currentTab = 'home';
 let _authListenerSet = false;
 function startApp() {
   document.getElementById('cover').style.display = 'none';
-  if (_authListenerSet) {
-    if (checkSession()) {
-      document.getElementById('main').style.display = 'flex';
-      if (isAdmin) initFirestore().catch(()=>{});
-      showTab('home');
-    } else {
-      showLoginScreen();
-    }
-    return;
-  }
+  if (_authListenerSet) return;
   _authListenerSet = true;
-  auth.onAuthStateChanged(function(firebaseUser) {
-    if (firebaseUser && checkSession()) {
+
+  auth.onAuthStateChanged(async function(firebaseUser) {
+    // tryLogin이 이미 메인 화면을 열었으면 중복 처리 방지
+    if (document.getElementById('main').style.display === 'flex') return;
+
+    if (!firebaseUser) {
+      showLoginScreen();
+      return;
+    }
+
+    // Firebase 이메일에서 생년월일 추출 (예: 19620304@lions.kr → 19620304)
+    const birth = (firebaseUser.email || '').split('@')[0];
+    if (!birth || birth.length !== 8 || !/^\d{8}$/.test(birth)) {
+      await auth.signOut().catch(()=>{});
+      showLoginScreen();
+      return;
+    }
+
+    // 1순위: localStorage 빠른 복원
+    if (checkSession() && currentUser && currentUser.birth === birth) {
       document.getElementById('main').style.display = 'flex';
       if (isAdmin) initFirestore().catch(()=>{});
       showTab('home');
-    } else {
-      showLoginScreen();
+      return;
     }
+
+    // 2순위: Firestore에서 회원 정보 복원
+    try {
+      const snap = await db.collection('members').doc(birth).get();
+      if (snap.exists) {
+        const d = snap.data();
+        if (d.status === '탈퇴') {
+          await auth.signOut().catch(()=>{});
+          showLoginScreen();
+          return;
+        }
+        currentUser = { birth, name: d.name || birth, id: d.id || birth };
+        isAdmin = ADMIN_BIRTHS.includes(birth);
+        localStorage.setItem('lions_user', JSON.stringify(currentUser));
+        document.getElementById('main').style.display = 'flex';
+        if (isAdmin) initFirestore().catch(()=>{});
+        showTab('home');
+        return;
+      }
+    } catch(e) { /* Firestore 오류 시 로컬 데이터로 폴백 */ }
+
+    // 3순위: MEMBERS_CLEAN 로컬 배열에서 복원
+    const localM = MEMBERS_CLEAN.find(m => parseBirth(m.b) === birth);
+    if (localM) {
+      currentUser = { birth, name: localM.name, id: localM.id };
+      isAdmin = ADMIN_BIRTHS.includes(birth);
+      localStorage.setItem('lions_user', JSON.stringify(currentUser));
+      document.getElementById('main').style.display = 'flex';
+      if (isAdmin) initFirestore().catch(()=>{});
+      showTab('home');
+      return;
+    }
+
+    // 어디서도 회원 정보를 찾을 수 없으면 로그인 화면
+    await auth.signOut().catch(()=>{});
+    showLoginScreen();
   });
 }
 function openApp() {
