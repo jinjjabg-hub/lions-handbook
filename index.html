@@ -333,7 +333,9 @@ if (window._savedUser) {
     if (document.getElementById('main') && document.getElementById('main').style.display === 'flex') {
       if (isAdmin) initFirestore().catch(()=>{});
       // showTab이 정의된 후 실행되도록 setTimeout 사용
-      setTimeout(function() { showTab('home'); }, 0);
+    setTimeout(function() { 
+      if (typeof showTab === 'function') showTab('home'); 
+    }, 100);
     }
   }
 
@@ -2588,27 +2590,30 @@ function showSpouseCard(spouseName, memberId) {
 
 // ===== 안드로이드 뒤로가기 =====
 (function() {
-  let backPressTime = 0;
   history.pushState(null, '', location.href);
 
   window.addEventListener('popstate', function() {
+    // currentUser 없으면 (로그인 안된 상태) 커버로
+    if (!currentUser && !isGuest) {
+      history.pushState(null, '', location.href);
+      return;
+    }
+
     var screens = document.getElementById('screens');
     var overlays = screens ? screens.querySelectorAll('.screen') : [];
 
     if (overlays.length > 1) {
+      // 상세 화면 닫기
       overlays[overlays.length - 1].remove();
       history.pushState(null, '', location.href);
     } else if (typeof currentTab !== 'undefined' && currentTab !== 'home') {
+      // 홈으로
       showTab('home');
       history.pushState(null, '', location.href);
     } else {
-      var now = Date.now();
-      if (now - backPressTime < 2000) {
-        return;
-      }
-      backPressTime = now;
-      showToast('한 번 더 누르면 종료됩니다');
+      // 홈에서 뒤로가기 → 앱 밖으로 안나감, 그냥 유지
       history.pushState(null, '', location.href);
+      showToast('홈 화면입니다');
     }
   });
 })();
