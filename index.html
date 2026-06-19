@@ -117,15 +117,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
     if (saved) {
       const u = JSON.parse(saved);
       if (u && u.birth && u.name) {
-        // UI 즉시 열기
+        // _savedUser 즉시 설정 (DOMContentLoaded 전에)
+        window._savedUser = u;
+        // UI 열기
         document.addEventListener('DOMContentLoaded', function() {
           var cover = document.getElementById('cover');
           var main = document.getElementById('main');
           if (cover) cover.style.display = 'none';
-          if (main) {
-            main.style.display = 'flex';
-            window._savedUser = u;
-          }
+          if (main) main.style.display = 'flex';
         });
         // Firebase Auth 백그라운드 자동 재로그인 (pw 있을 때만)
         if (u.pw) {
