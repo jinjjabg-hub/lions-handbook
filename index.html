@@ -117,14 +117,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
     if (saved) {
       const u = JSON.parse(saved);
       if (u && u.birth && u.name) {
-        // _savedUser 즉시 설정 (DOMContentLoaded 전에)
-        window._savedUser = u;
-        // UI 열기
+        // UI 즉시 열기
         document.addEventListener('DOMContentLoaded', function() {
           var cover = document.getElementById('cover');
           var main = document.getElementById('main');
           if (cover) cover.style.display = 'none';
-          if (main) main.style.display = 'flex';
+          if (main) {
+            main.style.display = 'flex';
+            window._savedUser = u;
+          }
         });
         // Firebase Auth 백그라운드 자동 재로그인 (pw 있을 때만)
         if (u.pw) {
@@ -332,9 +333,7 @@ if (window._savedUser) {
     if (document.getElementById('main') && document.getElementById('main').style.display === 'flex') {
       if (isAdmin) initFirestore().catch(()=>{});
       // showTab이 정의된 후 실행되도록 setTimeout 사용
-    setTimeout(function() { 
-      if (typeof showTab === 'function') showTab('home'); 
-    }, 100);
+      setTimeout(function() { showTab('home'); }, 0);
     }
   }
 
@@ -1097,7 +1096,7 @@ function renderMemberList(list) {
         <span style="font-size:12px;color:var(--muted)">${groups[k].length}</span>
       </div>`;
     groups[k].forEach(m => {
-      html += `<button onclick="${`isGuest ? showToast('회원 로그인 후 이용 가능합니다') : showMember(${m.id})`}" style="width:100%;display:flex;align-items:center;padding:11px 14px;gap:12px;text-align:left;border:none;border-bottom:1px solid var(--line);background:none;cursor:pointer">
+      html += `<button onclick="showMember(${m.id})" style="width:100%;display:flex;align-items:center;padding:11px 14px;gap:12px;text-align:left;border:none;border-bottom:1px solid var(--line);background:none;cursor:pointer">
         ${avatar(m.name, m.id===1, 46, m.id)}
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:7px">
@@ -1187,7 +1186,7 @@ function renderMemberCard(el, m) {
     </div>
 
     <div style="padding:16px">
-      ${m.dica || m.dicaUrl ?`<button onclick="window.open('${m.dicaUrl || 'https://jinjjabg-hub.github.io/DiCA/'+m.id}','_blank')" class="btn-primary btn-gold" style="margin-bottom:10px">디지털 명함 보기 →</button>`:''}
+      ${dica?`<button onclick="showToast('DiCA 명함으로 이동합니다')" class="btn-primary btn-gold" style="margin-bottom:10px">디지털 명함 보기 →</button>`:''}
       ${m.f && !isGuest ?`<button onclick="window.location.href='tel:${m.f.replace(/[^0-9]/g,'')}'" class="btn-primary" style="${dica?'':''}">📞 전화 연결</button>`:''}
     </div>
   </div>`;
@@ -1256,21 +1255,20 @@ function renderExec(el) {
 }
 
 function showOrgChart() {
-  const screens = document.getElementById('screens');
-  const div = document.createElement('div');
-  div.className = 'screen';
-  div.style.cssText = 'position:absolute;inset:0;z-index:9999;background:rgba(0,0,0,.95);overflow:hidden;display:flex;align-items:center;justify-content:center;flex-direction:column';
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.95);overflow:hidden;display:flex;align-items:center;justify-content:center';
 
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '✕';
   closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:20px;cursor:pointer;z-index:1;display:flex;align-items:center;justify-content:center';
-  closeBtn.onclick = () => div.remove();
+  closeBtn.onclick = () => document.body.removeChild(ov);
 
   const img = document.createElement('img');
   img.src = 'photo/org_chart.png';
   img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;transform-origin:center center;will-change:transform;user-select:none';
 
   let scale = 1, tx = 0, ty = 0;
+  let lastScale = 1, lastTx = 0, lastTy = 0;
   let startDist = 0, startScale = 1;
   let startX = 0, startY = 0;
   let lastTap = 0;
@@ -1285,14 +1283,19 @@ function showOrgChart() {
       const now = Date.now();
       if (now - lastTap < 300) {
         scale = scale > 1 ? 1 : 2;
-        tx = 0; ty = 0; applyTransform(); return;
+        tx = 0; ty = 0;
+        applyTransform();
+        lastTap = 0; return;
       }
       lastTap = now;
       startX = e.touches[0].clientX - tx;
       startY = e.touches[0].clientY - ty;
     } else if (e.touches.length === 2) {
-      startDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      startDist = Math.hypot(dx, dy);
       startScale = scale;
+      lastTx = tx; lastTy = ty;
     }
   }, {passive:false});
 
@@ -1303,16 +1306,19 @@ function showOrgChart() {
       ty = e.touches[0].clientY - startY;
       applyTransform();
     } else if (e.touches.length === 2) {
-      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      scale = Math.min(5, Math.max(1, startScale * dist / startDist));
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      scale = Math.min(Math.max(startScale * dist / startDist, 0.5), 6);
       applyTransform();
     }
   }, {passive:false});
 
-  div.appendChild(closeBtn);
-  div.appendChild(img);
-  screens.appendChild(div);
-  history.pushState(null, '', location.href);
+  ov.addEventListener('click', function(e) { if (e.target === ov) document.body.removeChild(ov); });
+
+  ov.appendChild(closeBtn);
+  ov.appendChild(img);
+  document.body.appendChild(ov);
 }
 
 function execChief(id, role, name) {
@@ -1810,121 +1816,15 @@ const HISTORY = [
 let selectedYear = null;
 
 function renderHistory(el) {
-  const ALL_HISTORY = [
-    ["초대","박근수","박원표","최우식","우신춘","김명찬"],
-    ["2대","김위상","김두남","최우식","문만수","손정원"],
-    ["3대","강재호","박원표","허 윤","문만수","김명찬"],
-    ["4대","백봉주","권오근","박원표","허 윤","이형순"],
-    ["5대","박하윤","박원표","박원표","허 윤","조영재"],
-    ["6대","양학진","조영재","박원표","허 윤","고재훈"],
-    ["7대","양학진","이재용","김자장","이형순",""],
-    ["8대","박원표","고재훈","박정달","박정순","이형순"],
-    ["9대","배종호","이형순","송창홍","이규녀","김종종"],
-    ["10대","권오근","김종종","김종근","김명수","김대언"],
-    ["11대","이형순","양사문","김대언","진근수","이이진"],
-    ["12대","김준기","김충환","이규녀","김용규","박성준"],
-    ["13대","김호지","김충환","권태성","윤용원","전직환"],
-    ["14대","정현주","박성준","윤용원","양사문","김오혁"],
-    ["15대","박명수","박성준","윤용원","김중근","이승원"],
-    ["16대","정욱규","허 진","양사문","김오혁","조정설"],
-    ["17대","윤용원","이승원","김오혁","이상태","김두남"],
-    ["18대","이용옥","김창석","김현배","권태성","김두남"],
-    ["19대","허 진","최진홍","방종수","이황세","유영준"],
-    ["20대","박경태","김중래","최창락","김창석","이상태"],
-    ["21대","김오혁","김두남","홍정식","김영우","김윤수"],
-    ["22대","이현욱","김부남","김중래","김명일","이도섭"],
-    ["23대","김창석","권오근","김원도","이진호","조용용"],
-    ["24대","정의석","김길연","박성기","최창락","박송희"],
-    ["25대","이용옥","이현욱","박성기","조창훈","이상보"],
-    ["26대","김철배","이황세","한재구","김영우","하규순"],
-    ["27대","방종수","김영우","하규순","박향만","이화준"],
-    ["28대","권태성","송우근","송영철","최창락","이화준"],
-    ["29대","황석동","이화준","주정만","김종일","김동규"],
-    ["30대","권오근","이황세","노재웅","송영철","어규순"],
-    ["31대","이황세","하규순","송영철","이정희","남수우"],
-    ["32대","김영우","김동규","배경기","이상영","이상영"],
-    ["33대","최의석","김철석","김복식","이상영","하규순"],
-    ["34대","김길연","김철석","박효봉","남수우","문원순"],
-    ["35대","황상영","이상영","최진권","문원순","이주석"],
-    ["36대","이화준","이상영","김정화","문원순","이주석"],
-    ["37대","남수우","안태봉","이주환","김학천","박진희"],
-    ["38대","이상영","이현욱","오복만","김학천","박성민"],
-    ["39대","허상봉","배봉주","김학현","김두화","정원기"],
-    ["40대","김철석","정원기","윤철수","남호석","박도석"],
-    ["41대","안태봉","이경신","김두화","황상영","전기호"],
-    ["42대","이현욱","박재민","송우근","김삼일","심도섭"],
-    ["43대","양한조","박동필","윤철수","정종희","강인구"],
-    ["44대","박재민","박재우","박재호","박재호","강병란"],
-    ["45대","이경신","이동철","김상락","권영근","남정현"],
-    ["46대","윤철수","김상락","심도섭","박재호","박재우"],
-    ["47대","김상락","정종국","박재우","박성재","이상호"],
-    ["48대","김학천","박재우","박재호","김병희","강병란"],
-    ["49대","박시윤","박성재","이상호","김근우","송근석"],
-    ["50대","김시옥","신수범","이상호","박재호","박재호"],
-    ["51대","정종국","성경우","이충우","박치열","윤철수"],
-    ["52대","이상영","오근우","송우근","이상영","박송근"],
-    ["53대","이광우","김상락","김인식","양기정","최기권"],
-    ["54대","김길연","이동철","최기권","남수우","문원순"],
-    ["55대","신수범","정세현","송우근","이현욱","임승호"],
-    ["56대","최성두","최기권","허광탁","임승호","임행수"],
-    ["57대","박송근","성경우","김성태","임행수","박정옥"],
-    ["58대","김형출","이현욱","송우근","성윤경","양기정"],
-    ["59대","정세현","손인활","임행수","곽대훈","김병도"],
-    ["60대","김귀동","김근우","허광탁","임행수","손인활"],
-    ["61대","김인식","양승현","곽대훈","손인활","조현철"],
-    ["62대","이현욱","곽대훈","임행수","조현철","이무준"],
-    ["63대","김영대","손인활","곽대훈","양승현","이청원"],
-    ["64대","곽대훈","김두석","조현철","이무준","채현식"],
-    ["65대","허광탁","김근우","양승현","박성민","장영민"],
-  ];
-
-  const rows = ALL_HISTORY.map((r, i) => {
-    const isCurrent = r[0] === '65대';
-    return `<tr style="${isCurrent ? 'background:rgba(240,192,64,.15);font-weight:700' : i%2===0 ? 'background:var(--bg)' : 'background:var(--card)'}">
-      <td style="padding:7px 6px;text-align:center;font-size:12px;color:${isCurrent?'var(--gold)':'var(--muted)'};font-weight:${isCurrent?'800':'400'};white-space:nowrap">${r[0]}</td>
-      <td style="padding:7px 4px;font-size:12px;color:var(--ink);text-align:center">${r[1]}</td>
-      <td style="padding:7px 4px;font-size:11px;color:var(--muted);text-align:center">${r[2]}</td>
-      <td style="padding:7px 4px;font-size:11px;color:var(--muted);text-align:center">${r[3]}</td>
-      <td style="padding:7px 4px;font-size:11px;color:var(--muted);text-align:center">${r[4]}</td>
-      <td style="padding:7px 4px;font-size:11px;color:var(--muted);text-align:center">${r[5]}</td>
-    </tr>`;
-  }).reverse().join(''); // 최신순
-
   el.innerHTML = `
   <div class="appbar">
     <div>
-      <div class="appbar-title">역대 집행부</div>
-      <div class="appbar-sub">초대 ~ 제65대 · 5역</div>
+      <div class="appbar-title">연혁 아카이브</div>
+      <div class="appbar-sub">과거 수첩 열람</div>
     </div>
   </div>
-  <div class="scroll" style="padding-bottom:24px">
-    <table style="width:100%;border-collapse:collapse">
-      <thead>
-        <tr style="background:var(--navy);position:sticky;top:0;z-index:1">
-          <th style="padding:10px 6px;font-size:11px;color:var(--gold);font-weight:700;text-align:center">회기</th>
-          <th style="padding:10px 4px;font-size:11px;color:var(--gold);font-weight:700;text-align:center">회장</th>
-          <th style="padding:10px 4px;font-size:11px;color:rgba(240,192,64,.7);font-weight:600;text-align:center">총무</th>
-          <th style="padding:10px 4px;font-size:11px;color:rgba(240,192,64,.7);font-weight:600;text-align:center">재무</th>
-          <th style="padding:10px 4px;font-size:11px;color:rgba(240,192,64,.7);font-weight:600;text-align:center">L.T</th>
-          <th style="padding:10px 4px;font-size:11px;color:rgba(240,192,64,.7);font-weight:600;text-align:center">T.T</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>`;
-}
-}
-
-function showHistoryImg(src) {
-  const screens = document.getElementById('screens');
-  const div = document.createElement('div');
-  div.className = 'screen';
-  div.style.cssText = 'position:absolute;inset:0;z-index:10;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column';
-  div.innerHTML = `
-  <button onclick="this.closest('.screen').remove()" style="position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);border:none;color:#fff;font-size:20px;cursor:pointer">✕</button>
-  <img src="${src}" style="max-width:100%;max-height:100%;object-fit:contain">`;
-  screens.appendChild(div);
-  history.pushState(null, '', location.href);
+  <div id="history-body" class="scroll" style="padding-bottom:24px"></div>`;
+  renderHistoryList(el.querySelector('#history-body'));
 }
 
 function renderHistoryList(container) {
@@ -2589,30 +2489,27 @@ function showSpouseCard(spouseName, memberId) {
 
 // ===== 안드로이드 뒤로가기 =====
 (function() {
+  let backPressTime = 0;
   history.pushState(null, '', location.href);
 
   window.addEventListener('popstate', function() {
-    // currentUser 없으면 (로그인 안된 상태) 커버로
-    if (!currentUser && !isGuest) {
-      history.pushState(null, '', location.href);
-      return;
-    }
-
     var screens = document.getElementById('screens');
     var overlays = screens ? screens.querySelectorAll('.screen') : [];
 
     if (overlays.length > 1) {
-      // 상세 화면 닫기
       overlays[overlays.length - 1].remove();
       history.pushState(null, '', location.href);
     } else if (typeof currentTab !== 'undefined' && currentTab !== 'home') {
-      // 홈으로
       showTab('home');
       history.pushState(null, '', location.href);
     } else {
-      // 홈에서 뒤로가기 → 앱 밖으로 안나감, 그냥 유지
+      var now = Date.now();
+      if (now - backPressTime < 2000) {
+        return;
+      }
+      backPressTime = now;
+      showToast('한 번 더 누르면 종료됩니다');
       history.pushState(null, '', location.href);
-      showToast('홈 화면입니다');
     }
   });
 })();
