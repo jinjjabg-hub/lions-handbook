@@ -2614,18 +2614,14 @@ function showSpouseCard(spouseName, memberId) {
 
 // ===== 안드로이드 뒤로가기 =====
 (function() {
-  var STACK_SIZE = 10;
+  var lastBackTime = 0;
 
-  function fillStack() {
-    for (var i = 0; i < STACK_SIZE; i++) {
-      history.pushState({depth: i}, '', location.href);
-    }
-  }
-  fillStack();
+  // 뒤로가기 누를 때마다 스택 1개 추가
+  history.pushState(null, '', location.href);
 
   window.addEventListener('popstate', function() {
-    // 스택 다시 채우기
-    fillStack();
+    // 스택 즉시 1개 다시 추가
+    history.pushState(null, '', location.href);
 
     // 1순위: body 팝업 오버레이 닫기
     var bodyOverlay = document.body.querySelector('div[style*="position:fixed"][style*="z-index:9999"]');
@@ -2645,8 +2641,15 @@ function showSpouseCard(spouseName, memberId) {
       return;
     }
 
-    // 4순위: 홈에서 뒤로가기 → 토스트만
-    showToast('홈 버튼을 이용해 나가세요');
+    // 4순위: 홈에서 뒤로가기 → 2초 안에 2번 누르면 종료
+    var now = Date.now();
+    if (now - lastBackTime < 2000) {
+      // 스택 비우고 나가기
+      history.go(-(history.length));
+      return;
+    }
+    lastBackTime = now;
+    showToast('한 번 더 누르면 종료됩니다');
   });
 })();
 
