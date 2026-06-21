@@ -2612,24 +2612,20 @@ function showSpouseCard(spouseName, memberId) {
   </div>`;
 }
 
-// ===== 안드로이드 뒤로가기 (hash 방식) =====
+// ===== 안드로이드 뒤로가기 =====
 (function() {
-  // hash를 #app으로 고정해서 뒤로가기를 #app → (빈해시) 로 유도
-  // popstate/hashchange 발생 시 즉시 #app 복원
-  function lockHash() {
-    if (location.hash !== '#app') {
-      location.replace(location.pathname + location.search + '#app');
+  var STACK_SIZE = 10;
+
+  function fillStack() {
+    for (var i = 0; i < STACK_SIZE; i++) {
+      history.pushState({depth: i}, '', location.href);
     }
   }
+  fillStack();
 
-  // 초기 설정
-  window.addEventListener('load', function() {
-    location.hash = '#app';
-  });
-
-  function handleBack() {
-    // 즉시 hash 복원 (앱 밖으로 못 나감)
-    setTimeout(lockHash, 0);
+  window.addEventListener('popstate', function() {
+    // 스택 다시 채우기
+    fillStack();
 
     // 1순위: body 팝업 오버레이 닫기
     var bodyOverlay = document.body.querySelector('div[style*="position:fixed"][style*="z-index:9999"]');
@@ -2651,10 +2647,7 @@ function showSpouseCard(spouseName, memberId) {
 
     // 4순위: 홈에서 뒤로가기 → 토스트만
     showToast('홈 버튼을 이용해 나가세요');
-  }
-
-  window.addEventListener('hashchange', handleBack);
-  window.addEventListener('popstate', handleBack);
+  });
 })();
 
 </script>
