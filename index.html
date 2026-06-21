@@ -2614,28 +2614,32 @@ function showSpouseCard(spouseName, memberId) {
 
 // ===== 안드로이드 뒤로가기 =====
 (function() {
-  let backPressTime = 0;
   history.pushState(null, '', location.href);
 
   window.addEventListener('popstate', function() {
-    var screens = document.getElementById('screens');
-    var overlays = screens ? screens.querySelectorAll('.screen') : [];
+    // 항상 스택 유지 (앱 밖으로 절대 안 나감)
+    history.pushState(null, '', location.href);
 
-    if (overlays.length > 1) {
-      overlays[overlays.length - 1].remove();
-      history.pushState(null, '', location.href);
-    } else if (typeof currentTab !== 'undefined' && currentTab !== 'home') {
-      showTab('home');
-      history.pushState(null, '', location.href);
-    } else {
-      var now = Date.now();
-      if (now - backPressTime < 2000) {
-        return;
-      }
-      backPressTime = now;
-      showToast('한 번 더 누르면 종료됩니다');
-      history.pushState(null, '', location.href);
+    // 1순위: body에 붙은 팝업 오버레이 닫기 (명함이미지, 연혁이미지 등)
+    var bodyOverlay = document.body.querySelector('div[style*="position:fixed"][style*="z-index:9999"]');
+    if (bodyOverlay) { bodyOverlay.remove(); return; }
+
+    // 2순위: screens 안의 상세 화면 닫기
+    var screens = document.getElementById('screens');
+    var layers = screens ? screens.querySelectorAll('.screen') : [];
+    if (layers.length > 1) {
+      layers[layers.length - 1].remove();
+      return;
     }
+
+    // 3순위: 탭이 홈이 아니면 홈으로
+    if (typeof currentTab !== 'undefined' && currentTab !== 'home') {
+      showTab('home');
+      return;
+    }
+
+    // 4순위: 홈에서 뒤로가기 → 안내 토스트만 (앱 밖으로 안 나감)
+    showToast('홈 버튼을 이용해 나가세요');
   });
 })();
 
