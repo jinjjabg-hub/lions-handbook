@@ -922,6 +922,7 @@ function showTab(tab) {
 }
 
 function showMember(id) {
+  if (isGuest) { showToast('로그인 후 열람 가능합니다'); return; }
   const m = MEMBERS_CLEAN.find(x => x.id === id);
   if (!m) return;
   const screens = document.getElementById('screens');
