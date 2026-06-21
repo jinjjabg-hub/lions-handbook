@@ -117,29 +117,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sa
     if (saved) {
       const u = JSON.parse(saved);
       if (u && u.birth && u.name) {
-        // UI 즉시 열기
+        window._savedUser = u;
+        // UI 즉시 열기 + 홈탭 표시
         document.addEventListener('DOMContentLoaded', function() {
           var cover = document.getElementById('cover');
           var main = document.getElementById('main');
           if (cover) cover.style.display = 'none';
           if (main) {
             main.style.display = 'flex';
-            window._savedUser = u;
+            // showTab이 준비된 후 홈 표시 (빈화면 방지)
+            setTimeout(function() {
+              if (typeof showTab === 'function') showTab('home');
+            }, 0);
           }
         });
-        // Firebase Auth 백그라운드 자동 재로그인 (pw 있을 때만)
-        if (u.pw) {
-          window._autoReloginPromise = new Promise(function(resolve) {
-            // Firebase SDK 로드 완료 후 실행 (window.onload 사용)
-            window.addEventListener('load', function() {
-              if (typeof auth === 'undefined') { resolve(false); return; }
-              if (auth.currentUser) { resolve(true); return; }
-              auth.signInWithEmailAndPassword(u.birth + '@lions.kr', u.pw)
-                .then(function() { resolve(true); })
-                .catch(function() { resolve(false); });
-            });
-          });
-        }
       }
     }
   } catch(e) {}
@@ -329,19 +320,11 @@ if (window._savedUser) {
   currentUser = window._savedUser;
   isAdmin = ADMIN_BIRTHS.includes(currentUser.birth);
 
-  function _restoreHome() {
-    if (document.getElementById('main') && document.getElementById('main').style.display === 'flex') {
-      if (isAdmin) initFirestore().catch(()=>{});
-      // showTab이 정의된 후 실행되도록 setTimeout 사용
-      setTimeout(function() { showTab('home'); }, 0);
-    }
-  }
-
-  // DOMContentLoaded가 이미 지났으면 즉시 실행, 아니면 이벤트 대기
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _restoreHome);
-  } else {
-    _restoreHome();
+  // 관리자면 Firestore 즉시 초기화 (공지 기능 타이밍 보장)
+  if (isAdmin) {
+    window.addEventListener('load', function() {
+      initFirestore().catch(()=>{});
+    });
   }
 }
 
