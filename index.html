@@ -1877,6 +1877,74 @@ function searchReg(q) {
 }
 
 // ===== 연혁 =====
+const EXEC_HISTORY = [
+  {gen:1,president:'박근수',총무:'최우식',재무:'최우식',lt:'문만수',tt:'김명환'},
+  {gen:2,president:'박근수',총무:'박원표',재무:'최우식',lt:'문만수',tt:'김명환'},
+  {gen:3,president:'강재호',총무:'박원표',재무:'허 윤',lt:'문만수',tt:'김명환'},
+  {gen:4,president:'강재호',총무:'박원표',재무:'박원표',lt:'허 윤',tt:'조영래'},
+  {gen:5,president:'박하윤',총무:'박원표',재무:'박원표',lt:'허 윤',tt:'조영래'},
+  {gen:6,president:'양학진',총무:'조영재',재무:'박원표',lt:'허 윤',tt:'고재훈'},
+  {gen:7,president:'양학진',총무:'이재홍',재무:'이재홍',lt:'허 윤',tt:'이명훈'},
+  {gen:8,president:'박원표',총무:'고재훈',재무:'박정달',lt:'박정순',tt:'이형순'},
+  {gen:9,president:'배재호',총무:'이형순',재무:'이형순',lt:'김택서',tt:'김명준'},
+  {gen:10,president:'조영재',총무:'김용종',재무:'이이진',lt:'김명수',tt:'김대인'},
+  {gen:11,president:'이형순',총무:'양사무',재무:'김대인',lt:'권근수',tt:'이이진'},
+  {gen:12,president:'김준기',총무:'김충환',재무:'이규타',lt:'윤용희',tt:'권인달'},
+  {gen:13,president:'김호지',총무:'김충환',재무:'권태성',lt:'윤용희',tt:'권인달'},
+  {gen:14,president:'정인주',총무:'박성준',재무:'윤용희',lt:'양사무',tt:'김오혁'},
+  {gen:15,president:'김명수',총무:'박성준',재무:'윤용희',lt:'윤용희',tt:'이승현'},
+  {gen:16,president:'정옥균',총무:'허 진',재무:'양사무',lt:'김오혁',tt:'조형섭'},
+  {gen:17,president:'이경선',총무:'이이진',재무:'김오혁',lt:'허 진',tt:'조형남'},
+  {gen:18,president:'이동욱',총무:'김창석',재무:'김현배',lt:'권태성',tt:'김두하'},
+  {gen:19,president:'허 진',총무:'최진웅',재무:'방준수',lt:'이광세',tt:'유영준'},
+  {gen:20,president:'박경태',총무:'김종래',재무:'최창락',lt:'이광세',tt:'이이진'},
+  {gen:21,president:'김오혁',총무:'김두남',재무:'홍정석',lt:'김영우',tt:'김용수'},
+  {gen:22,president:'김위상',총무:'김두남',재무:'김재묵',lt:'김길현',tt:'임원호'},
+  {gen:23,president:'김길현',총무:'김창수',재무:'박성기',lt:'최창박',tt:'박송희'},
+  {gen:24,president:'권의석',총무:'김길현',재무:'박성기',lt:'최창박',tt:'이용장'},
+  {gen:25,president:'김창오',총무:'권오근',재무:'박성기',lt:'조용웅',tt:'이용장'},
+  {gen:26,president:'김현배',총무:'권오근',재무:'한재구',lt:'방만영',tt:'하규순'},
+  {gen:27,president:'방준수',총무:'김영우',재무:'하규순',lt:'방만영',tt:'김창환'},
+  {gen:28,president:'권태성',총무:'김영우',재무:'송양춘',lt:'최영규',tt:'방만영'},
+  {gen:29,president:'황석동',총무:'이화준',재무:'주칭만',lt:'김중열',tt:'김동규'},
+  {gen:30,president:'권오근',총무:'황상영',재무:'노재형',lt:'송영춘',tt:'하규순'},
+  {gen:31,president:'이광세',총무:'이화준',재무:'하규순',lt:'송영춘',tt:'남수우'},
+  {gen:32,president:'김영우',총무:'김동규',재무:'백정기',lt:'이상영',tt:'하규순'},
+  {gen:33,president:'최정석',총무:'김상묵',재무:'이정희',lt:'하규순',tt:'이상영'},
+  {gen:34,president:'김길현',총무:'박충화',재무:'박충화',lt:'하규순',tt:'문환선'},
+  {gen:35,president:'황상영',총무:'이상영',재무:'석진규',lt:'김영기',tt:'김진석'},
+  {gen:36,president:'이화준',총무:'송정현',재무:'김성하',lt:'하규탁',tt:'임행수'},
+  {gen:37,president:'남수우',총무:'안태봉',재무:'이주한',lt:'김학천',tt:'박진화'},
+  {gen:38,president:'이상영',총무:'박진희',재무:'오복판',lt:'박시윤',tt:'백봉주'},
+  {gen:39,president:'이상봉',총무:'백봉주',재무:'김학천',lt:'이주한',tt:'김영기'},
+  {gen:40,president:'김진석',총무:'정원기',재무:'윤철성',lt:'남도달',tt:'박도섭'},
+  {gen:41,president:'안태봉',총무:'이경선',재무:'김두화',lt:'황상영',tt:'전기호'},
+  {gen:42,president:'박진희',총무:'박재민',재무:'송우근',lt:'배병태',tt:'심도섭'},
+  {gen:43,president:'양한조',총무:'이경선',재무:'윤철수',lt:'이이진',tt:'강인구'},
+  {gen:44,president:'백봉주',총무:'정종희',재무:'정종국',lt:'김상락',tt:'이동철'},
+  {gen:45,president:'이경선',총무:'이상조',재무:'김상락',lt:'심도섭',tt:'박재우'},
+  {gen:46,president:'윤철수',총무:'김상락',재무:'심도섭',lt:'박재우',tt:'하규순'},
+  {gen:47,president:'박재민',총무:'정종국',재무:'강규식',lt:'박경재',tt:'이상호'},
+  {gen:48,president:'김학천',총무:'박경재',재무:'박경재',lt:'박재우',tt:'강병렬'},
+  {gen:49,president:'박시윤',총무:'박경재',재무:'이상오',lt:'김근우',tt:'송근석'},
+  {gen:50,president:'김상락',총무:'신수범',재무:'김갑수',lt:'김인식',tt:'박재호'},
+  {gen:51,president:'정종국',총무:'이경선',재무:'이중우',lt:'박태인',tt:'박송근'},
+  {gen:52,president:'이상오',총무:'김근우',재무:'송우근',lt:'박태인',tt:'박송근'},
+  {gen:53,president:'이장우',총무:'김인식',재무:'김인식',lt:'양기정',tt:'윤철성'},
+  {gen:54,president:'박재호',총무:'이동철',재무:'최기권',lt:'양기정',tt:'윤철성'},
+  {gen:55,president:'신수범',총무:'정세현',재무:'송우근',lt:'이현욱',tt:'임승호'},
+  {gen:56,president:'최성두',총무:'최기권',재무:'허광탁',lt:'이하탁',tt:'임행수'},
+  {gen:57,president:'박송근',총무:'성경우',재무:'김성태',lt:'임행수',tt:'박경재'},
+  {gen:58,president:'김형출',총무:'이현욱',재무:'송우근',lt:'정윤경',tt:'양기정'},
+  {gen:59,president:'정세현',총무:'손인활',재무:'임행수',lt:'곽대훈',tt:'김병도'},
+  {gen:60,president:'김귀동',총무:'김근우',재무:'이하탁',lt:'임행수',tt:'손인활'},
+  {gen:61,president:'김인식',총무:'양승현',재무:'박대훈',lt:'손인활',tt:'조현철'},
+  {gen:62,president:'이현욱',총무:'곽대훈',재무:'임행수',lt:'조현철',tt:'이무준'},
+  {gen:63,president:'김영대',총무:'손인활',재무:'곽대훈',lt:'양승현',tt:'이청원'},
+  {gen:64,president:'곽대훈',총무:'김두석',재무:'조현철',lt:'이무준',tt:'채현식'},
+  {gen:65,president:'허광탁',총무:'김근우',재무:'양승현',lt:'박성민',tt:'장영민'},
+];
+
 const HISTORY = [
   {year:'2024–2025',gen:'제65대',president:'허광탁',guide:'다 함께 행복한 나눔 봉사!',officers:'총무 김근우 · 재무 양승현 · L.T 박성민 · T.T 장영민',current:true},
   {year:'2023–2024',gen:'제64대',president:'곽대훈',guide:'',officers:'총무 김두석 · 재무 조현철 · L.T 이무준 · T.T 채현식'},
@@ -1898,79 +1966,58 @@ function renderHistory(el) {
   <div class="appbar">
     <div>
       <div class="appbar-title">연혁 아카이브</div>
-      <div class="appbar-sub">과거 수첩 열람</div>
+      <div class="appbar-sub">부산라이온스클럽 65년</div>
     </div>
   </div>
-  <div id="history-body" class="scroll" style="padding-bottom:24px"></div>`;
-  renderHistoryList(el.querySelector('#history-body'));
+  <div class="scroll" style="padding-bottom:24px">
+    <div class="section-label">클럽 연혁</div>
+    <div onclick="showHistoryImage()" style="margin:0 16px 10px;border-radius:14px;background:linear-gradient(135deg,#1c3e72,#0e2140);padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(240,192,64,.2);border:1px solid rgba(240,192,64,.4);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px">📋</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:#fff">부산라이온스클럽 65주년 연혁</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:3px">자매결연 · 클럽회장 현황 등</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="rgba(255,255,255,.6)" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </div>
+
+    <div class="section-label" style="margin-top:8px">역대 집행부 5역 (초대~65대)</div>
+    <div style="overflow-x:auto;margin:0 16px 14px;border-radius:14px;border:1px solid var(--line);background:var(--card)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px">
+        <thead><tr style="background:var(--navy);color:#fff;position:sticky;top:0">
+          <th style="padding:9px 6px;text-align:center;font-weight:700;width:36px">대</th>
+          <th style="padding:9px 6px;text-align:center;font-weight:700">회장</th>
+          <th style="padding:9px 6px;text-align:center;font-weight:700">총무</th>
+          <th style="padding:9px 6px;text-align:center;font-weight:700">재무</th>
+          <th style="padding:9px 6px;text-align:center;font-weight:700">L.T</th>
+          <th style="padding:9px 6px;text-align:center;font-weight:700">T.T</th>
+        </tr></thead>
+        <tbody>
+          ${EXEC_HISTORY.map((r,i) => `<tr style="background:${i%2===0?'var(--card)':'var(--paper)'}${r.gen===65?';outline:2px solid var(--navy)':''}">
+            <td style="padding:8px 6px;text-align:center;font-weight:800;color:${r.gen===65?'var(--gold-d)':'var(--muted)'};font-size:11px">${r.gen}</td>
+            <td style="padding:8px 6px;text-align:center;font-weight:700;color:var(--navy)">${r.president}</td>
+            <td style="padding:8px 6px;text-align:center;color:var(--ink)">${r.총무}</td>
+            <td style="padding:8px 6px;text-align:center;color:var(--ink)">${r.재무}</td>
+            <td style="padding:8px 6px;text-align:center;color:var(--ink)">${r.lt}</td>
+            <td style="padding:8px 6px;text-align:center;color:var(--ink)">${r.tt}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
 }
 
-function renderHistoryList(container) {
-  let html = `<div class="section-label">회기 선택</div>`;
-  HISTORY.forEach(h => {
-    html += `<div onclick="showYearDetail(${HISTORY.indexOf(h)})" class="year-card${h.current?' current':''}">
-      <div>
-        <div style="font-size:16px;font-weight:700;color:var(--ink)">${h.year}</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">${h.gen} · 회장 ${h.president}</div>
+function showHistoryImage() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.9);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:16px';
+  overlay.onclick = (e) => { if(e.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div style="width:100%;max-width:430px">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+        <button onclick="this.closest('[style]').remove()" style="background:rgba(255,255,255,.2);border:none;border-radius:10px;padding:8px 16px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">✕ 닫기</button>
       </div>
-      ${h.current?'<span class="year-badge-current">현재</span>':'<span class="year-badge-past">보기 →</span>'}
+      <img src="연혁.png" style="width:100%;border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.5)">
     </div>`;
-  });
-
-  html += `<div class="section-label" style="margin-top:8px">클럽 주요 연혁</div>
-  <div class="card">
-    <div class="row"><div><div class="row-label">조직총회</div><div class="row-val">1960년 6월 18일 · 부산은행 집회소</div></div></div>
-    <div class="row"><div><div class="row-label">헌장의 밤</div><div class="row-val">1960년 9월 24일</div></div></div>
-    <div class="row"><div><div class="row-label">창립 회원</div><div class="row-val">고 박근수 외 27명</div></div></div>
-    <div class="row"><div><div class="row-label">스폰서</div><div class="row-val">미공군 헤레나 중령</div></div></div>
-    <div class="row"><div><div class="row-label">국내 자매결연</div><div class="row-val">2009. 2. 19 서울 L.C</div></div></div>
-  </div>`;
-  container.innerHTML = html;
-}
-
-function showYearDetail(idx) {
-  const h = HISTORY[idx];
-  const screens = document.getElementById('screens');
-  const div = document.createElement('div');
-  div.className = 'screen';
-  div.style.cssText = 'position:absolute;inset:0;z-index:10;display:flex;flex-direction:column';
-  screens.appendChild(div);
-
-  div.innerHTML = `
-  <div class="appbar">
-    <button class="appbar-back" onclick="this.closest('.screen').remove()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 5l-7 7 7 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <div>
-      <div class="appbar-title">${h.year} ${h.gen}</div>
-      <div class="appbar-sub">회장 ${h.president}</div>
-    </div>
-  </div>
-  <div class="scroll" style="padding-bottom:30px">
-    <div style="margin:16px;border-radius:18px;background:linear-gradient(135deg,#1c3e72,#0e2140);color:#fff;padding:22px;text-align:center">
-      <div style="font-size:12px;color:var(--gold-l);letter-spacing:3px">국제라이온스협회 355-A지구</div>
-      <div style="width:36px;height:1px;background:var(--gold);margin:12px auto;opacity:.7"></div>
-      <img src="photo/lions_logo_transparent.png" style="width:120px;height:120px;object-fit:contain;margin:0 auto 12px;display:block" onerror="this.style.display='none'">
-      <div style="font-size:22px;font-weight:800">부산라이온스클럽</div>
-      <div style="font-size:12px;color:var(--gold-l);margin-top:6px;letter-spacing:3px">BUSAN LIONS CLUB</div>
-      <div style="display:inline-flex;align-items:center;gap:10px;margin-top:14px;padding:8px 18px;border-radius:30px;background:rgba(240,192,64,.15);border:1px solid rgba(240,192,64,.4)">
-        <span style="font-size:14px;color:var(--gold);font-weight:700">${h.gen}</span>
-        <span style="width:4px;height:4px;border-radius:50%;background:var(--gold)"></span>
-        <span style="font-size:14px;color:#fff;font-weight:700">${h.year}</span>
-      </div>
-    </div>
-
-    <div class="section-label">회장단</div>
-    <div class="card">
-      <div class="row"><div><div class="row-label">회장</div><div class="row-val" style="font-size:18px;font-weight:800;color:var(--navy)">${h.president}</div></div></div>
-      ${h.guide?`<div class="row"><div><div class="row-label">회장지침</div><div class="row-val">${h.guide}</div></div></div>`:''}
-    </div>
-
-    <div class="section-label">5역 임원</div>
-    <div class="card">
-      ${h.officers.split(' · ').map(o=>`<div class="row"><div class="row-val">${o}</div></div>`).join('')}
-    </div>
-  </div>`;
+  document.body.appendChild(overlay);
 }
 
 // ===== 공지사항 탭 =====
