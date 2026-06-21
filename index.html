@@ -2614,13 +2614,19 @@ function showSpouseCard(spouseName, memberId) {
 
 // ===== 안드로이드 뒤로가기 =====
 (function() {
-  history.pushState(null, '', location.href);
+  // 스택을 50개 쌓아서 절대 바닥나지 않게
+  function fillStack() {
+    for (var i = 0; i < 50; i++) {
+      history.pushState({depth: i}, '', location.href);
+    }
+  }
+  fillStack();
 
   window.addEventListener('popstate', function() {
-    // 항상 스택 유지 (앱 밖으로 절대 안 나감)
-    history.pushState(null, '', location.href);
+    // 스택 다시 채우기 (바닥날 위험 원천 차단)
+    fillStack();
 
-    // 1순위: body에 붙은 팝업 오버레이 닫기 (명함이미지, 연혁이미지 등)
+    // 1순위: body에 붙은 팝업 오버레이 닫기
     var bodyOverlay = document.body.querySelector('div[style*="position:fixed"][style*="z-index:9999"]');
     if (bodyOverlay) { bodyOverlay.remove(); return; }
 
@@ -2638,7 +2644,7 @@ function showSpouseCard(spouseName, memberId) {
       return;
     }
 
-    // 4순위: 홈에서 뒤로가기 → 안내 토스트만 (앱 밖으로 안 나감)
+    // 4순위: 홈에서 뒤로가기 → 토스트만
     showToast('홈 버튼을 이용해 나가세요');
   });
 })();
