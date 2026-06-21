@@ -932,15 +932,15 @@ async function showMember(id) {
   screens.appendChild(div);
 
   // Firestore에서 링크 데이터 로드
-  let extra = { dicaUrl: \'\', bizImgUrl: \'\'};
+  let extra = { dicaUrl: '', bizImgUrl: '' };
   try {
     const birth = parseBirth(m.b);
     if (birth) {
-      const snap = await db.collection(\'members\').doc(birth).get();
+      const snap = await db.collection('members').doc(birth).get();
       if (snap.exists) {
         const d = snap.data();
-        extra.dicaUrl = d.dicaUrl || \'\';
-        extra.bizImgUrl = d.bizImgUrl || \'\';
+        extra.dicaUrl = d.dicaUrl || '';
+        extra.bizImgUrl = d.bizImgUrl || '';
       }
     }
   } catch(e) {}
