@@ -2,7 +2,7 @@
   "name": "부산라이온스클럽 디지털 회원수첩",
   "short_name": "라이온스수첩",
   "description": "부산라이온스클럽 디지털 회원수첩 - 회원 정보, 집행부, 클럽 헌장",
-  "start_url": "/lions-handbook/",
+  "start_url": "/lions-handbook/#app",
   "scope": "/lions-handbook/",
   "display": "standalone",
   "orientation": "portrait",
