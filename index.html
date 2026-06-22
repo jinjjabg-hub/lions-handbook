@@ -902,10 +902,6 @@ function showTab(tab) {
     showToast('회원 로그인 후 이용 가능합니다');
     return;
   }
-  // 탭 변경 시 히스토리에 기록
-  if (currentTab !== tab) {
-    history.pushState({ tab: tab }, '', location.href);
-  }
   currentTab = tab;
   Object.keys(_unsubs).forEach(k => { if (_unsubs[k]) { _unsubs[k](); _unsubs[k]=null; } });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -2618,50 +2614,57 @@ function showSpouseCard(spouseName, memberId) {
 
 // ===== 안드로이드 뒤로가기 =====
 (function() {
+  // 탭 이동 히스토리 직접 관리 (history API 보조용)
+  var tabStack = ['home'];
   var lastBackTime = 0;
-  // 초기 홈 스택 1개
-  history.pushState({ tab: 'home' }, '', location.href);
 
-  window.addEventListener('popstate', function(e) {
+  // showTab 호출될 때 탭 스택에 기록
+  var _origShowTab = null;
+  window.addEventListener('load', function() {
+    _origShowTab = showTab;
+    window.showTab = function(tab) {
+      if (tabStack[tabStack.length - 1] !== tab) {
+        tabStack.push(tab);
+      }
+      // 스택 유지 (popstate 소비용)
+      history.pushState({ idx: tabStack.length }, '', location.href);
+      _origShowTab(tab);
+    };
+    // 초기 홈 스택
+    history.pushState({ idx: 1 }, '', location.href);
+  });
+
+  window.addEventListener('popstate', function() {
+    // 스택 즉시 복원 (앱 밖 이탈 방지)
+    history.pushState({ idx: tabStack.length }, '', location.href);
+
     // 1순위: body 팝업 오버레이 닫기
     var bodyOverlay = document.body.querySelector('div[style*="position:fixed"][style*="z-index:9999"]');
-    if (bodyOverlay) {
-      bodyOverlay.remove();
-      history.pushState({ tab: currentTab }, '', location.href);
-      return;
-    }
+    if (bodyOverlay) { bodyOverlay.remove(); return; }
 
-    // 2순위: screens 상세 화면 닫기 (회원카드, 편집화면 등)
+    // 2순위: screens 상세 화면 닫기
     var screens = document.getElementById('screens');
     var layers = screens ? screens.querySelectorAll('.screen') : [];
     if (layers.length > 1) {
       layers[layers.length - 1].remove();
-      history.pushState({ tab: currentTab }, '', location.href);
       return;
     }
 
-    // 3순위: 이전 탭으로 이동 (state에 tab 정보 있으면)
-    if (e.state && e.state.tab && e.state.tab !== currentTab) {
-      var prevTab = e.state.tab;
-      currentTab = ''; // 강제 변경 허용
-      showTab(prevTab);
+    // 3순위: 이전 탭으로 (탭 스택에서 꺼내기)
+    if (tabStack.length > 1) {
+      tabStack.pop();
+      var prevTab = tabStack[tabStack.length - 1];
+      if (_origShowTab) _origShowTab(prevTab);
       return;
     }
 
-    // 4순위: 홈이 아니면 홈으로
-    if (typeof currentTab !== 'undefined' && currentTab !== 'home') {
-      showTab('home');
-      return;
-    }
-
-    // 5순위: 홈에서 2초내 2번 누르면 종료
+    // 4순위: 홈에서 2초내 2번 → 종료
     var now = Date.now();
     if (now - lastBackTime < 2000) {
       history.go(-history.length);
       return;
     }
     lastBackTime = now;
-    history.pushState({ tab: 'home' }, '', location.href);
     showToast('한 번 더 누르면 종료됩니다');
   });
 })();
