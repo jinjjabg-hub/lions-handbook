@@ -902,6 +902,10 @@ function showTab(tab) {
     showToast('회원 로그인 후 이용 가능합니다');
     return;
   }
+  // 탭 변경 시 히스토리에 기록
+  if (currentTab !== tab) {
+    history.pushState({ tab: tab }, '', location.href);
+  }
   currentTab = tab;
   Object.keys(_unsubs).forEach(k => { if (_unsubs[k]) { _unsubs[k](); _unsubs[k]=null; } });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -2615,40 +2619,49 @@ function showSpouseCard(spouseName, memberId) {
 // ===== 안드로이드 뒤로가기 =====
 (function() {
   var lastBackTime = 0;
+  // 초기 홈 스택 1개
+  history.pushState({ tab: 'home' }, '', location.href);
 
-  // 뒤로가기 누를 때마다 스택 1개 추가
-  history.pushState(null, '', location.href);
-
-  window.addEventListener('popstate', function() {
-    // 스택 즉시 1개 다시 추가
-    history.pushState(null, '', location.href);
-
+  window.addEventListener('popstate', function(e) {
     // 1순위: body 팝업 오버레이 닫기
     var bodyOverlay = document.body.querySelector('div[style*="position:fixed"][style*="z-index:9999"]');
-    if (bodyOverlay) { bodyOverlay.remove(); return; }
+    if (bodyOverlay) {
+      bodyOverlay.remove();
+      history.pushState({ tab: currentTab }, '', location.href);
+      return;
+    }
 
-    // 2순위: screens 상세 화면 닫기
+    // 2순위: screens 상세 화면 닫기 (회원카드, 편집화면 등)
     var screens = document.getElementById('screens');
     var layers = screens ? screens.querySelectorAll('.screen') : [];
     if (layers.length > 1) {
       layers[layers.length - 1].remove();
+      history.pushState({ tab: currentTab }, '', location.href);
       return;
     }
 
-    // 3순위: 탭이 홈 아니면 홈으로
+    // 3순위: 이전 탭으로 이동 (state에 tab 정보 있으면)
+    if (e.state && e.state.tab && e.state.tab !== currentTab) {
+      var prevTab = e.state.tab;
+      currentTab = ''; // 강제 변경 허용
+      showTab(prevTab);
+      return;
+    }
+
+    // 4순위: 홈이 아니면 홈으로
     if (typeof currentTab !== 'undefined' && currentTab !== 'home') {
       showTab('home');
       return;
     }
 
-    // 4순위: 홈에서 뒤로가기 → 2초 안에 2번 누르면 종료
+    // 5순위: 홈에서 2초내 2번 누르면 종료
     var now = Date.now();
     if (now - lastBackTime < 2000) {
-      // 스택 비우고 나가기
-      history.go(-(history.length));
+      history.go(-history.length);
       return;
     }
     lastBackTime = now;
+    history.pushState({ tab: 'home' }, '', location.href);
     showToast('한 번 더 누르면 종료됩니다');
   });
 })();
