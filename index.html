@@ -1020,6 +1020,217 @@ async function saveMemberLinks(birth, btn) {
 }
 
 // ===== 홈 =====
+// ===== 달력 =====
+function getBirthdays(year, month) {
+  // MEMBERS_CLEAN에서 해당 월 생일 추출
+  const birthdays = [];
+  MEMBERS_CLEAN.forEach(m => {
+    if (!m.b) return;
+    const parts = m.b.replace(/[^0-9.]/g,'').split('.');
+    if (parts.length < 3) return;
+    const bMonth = parseInt(parts[1]);
+    const bDay = parseInt(parts[2]);
+    if (bMonth === month) {
+      birthdays.push({ day: bDay, name: m.name });
+    }
+  });
+  return birthdays;
+}
+
+function renderCalendar(year, month, events, birthdays) {
+  const today = new Date();
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const lastDate = new Date(year, month, 0).getDate();
+  const monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+  // 날짜별 이벤트 맵
+  const evtMap = {};
+  events.forEach(e => {
+    const d = parseInt(e.day);
+    if (!evtMap[d]) evtMap[d] = [];
+    evtMap[d].push({ type: 'event', title: e.title });
+  });
+  birthdays.forEach(b => {
+    const d = b.day;
+    if (!evtMap[d]) evtMap[d] = [];
+    evtMap[d].push({ type: 'birthday', name: b.name });
+  });
+
+  let html = `
+  <div style="margin:0 16px 8px;border-radius:16px;background:var(--card);border:1px solid var(--line);overflow:hidden">
+    <!-- 달력 헤더 -->
+    <div style="background:var(--navy);padding:14px 16px;display:flex;align-items:center;justify-content:space-between">
+      <button onclick="calendarMove(-1)" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;padding:6px 12px;color:#fff;font-size:16px;cursor:pointer">‹</button>
+      <div style="color:#fff;font-weight:800;font-size:16px">${year}년 ${monthNames[month-1]}</div>
+      <button onclick="calendarMove(1)" style="background:rgba(255,255,255,.2);border:none;border-radius:8px;padding:6px 12px;color:#fff;font-size:16px;cursor:pointer">›</button>
+    </div>
+    <!-- 요일 헤더 -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);background:rgba(0,0,0,.04)">
+      ${['일','월','화','수','목','금','토'].map((d,i) =>
+        `<div style="text-align:center;padding:8px 0;font-size:11px;font-weight:700;color:${i===0?'#e53935':i===6?'#1565c0':'var(--muted)'}">${d}</div>`
+      ).join('')}
+    </div>
+    <!-- 날짜 -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line)">`;
+
+  // 빈칸 채우기
+  for (let i = 0; i < firstDay; i++) {
+    html += `<div style="background:var(--card);min-height:52px"></div>`;
+  }
+
+  for (let d = 1; d <= lastDate; d++) {
+    const isToday = (year === today.getFullYear() && month === today.getMonth()+1 && d === today.getDate());
+    const dayOfWeek = (firstDay + d - 1) % 7;
+    const isSun = dayOfWeek === 0;
+    const isSat = dayOfWeek === 6;
+    const dayEvents = evtMap[d] || [];
+    const hasBirthday = dayEvents.some(e => e.type === 'birthday');
+    const hasEvent = dayEvents.some(e => e.type === 'event');
+
+    html += `<div onclick="showDayDetail(${year},${month},${d})" style="background:var(--card);min-height:52px;padding:4px;cursor:${dayEvents.length?'pointer':'default'}">
+      <div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 2px;
+        background:${isToday?'var(--navy)':'transparent'};
+        font-size:13px;font-weight:${isToday?'800':'600'};
+        color:${isToday?'#fff':isSun?'#e53935':isSat?'#1565c0':'var(--ink)'}">${d}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+        ${hasEvent ? `<div style="width:6px;height:6px;border-radius:50%;background:var(--gold-d)"></div>` : ''}
+        ${hasBirthday ? `<div style="font-size:9px;text-align:center;color:#e91e8c;line-height:1.2">🎂</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  html += `</div>`;
+
+  // 이번달 일정/생일 목록
+  const allItems = [];
+  Object.keys(evtMap).sort((a,b)=>a-b).forEach(d => {
+    evtMap[d].forEach(e => {
+      allItems.push({ day: parseInt(d), ...e });
+    });
+  });
+
+  if (allItems.length) {
+    html += `<div style="margin-top:8px;border-top:1px solid var(--line)">`;
+    allItems.forEach(item => {
+      if (item.type === 'event') {
+        html += `<div style="padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)">
+          <div style="width:32px;height:32px;border-radius:8px;background:rgba(240,192,64,.15);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--gold-d);flex-shrink:0">${item.day}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--ink)">${item.title}</div>
+            <div style="font-size:11px;color:var(--muted)">📅 라이온스 일정</div>
+          </div>
+        </div>`;
+      } else {
+        html += `<div style="padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)">
+          <div style="width:32px;height:32px;border-radius:8px;background:rgba(233,30,140,.1);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#e91e8c;flex-shrink:0">${item.day}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--ink)">${item.name} L</div>
+            <div style="font-size:11px;color:#e91e8c">🎂 생일</div>
+          </div>
+        </div>`;
+      }
+    });
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// 달력 현재 연월 상태
+window._calYear = new Date().getFullYear();
+window._calMonth = new Date().getMonth() + 1;
+window._calEvents = [];
+
+function calendarMove(dir) {
+  _calMonth += dir;
+  if (_calMonth > 12) { _calMonth = 1; _calYear++; }
+  if (_calMonth < 1) { _calMonth = 12; _calYear--; }
+  refreshCalendar();
+}
+
+function refreshCalendar() {
+  const el = document.getElementById('home-calendar');
+  if (!el) return;
+  const birthdays = getBirthdays(_calYear, _calMonth);
+  el.innerHTML = renderCalendar(_calYear, _calMonth, _calEvents, birthdays);
+}
+
+function showDayDetail(year, month, day) {
+  const birthdays = getBirthdays(year, month).filter(b => b.day === day);
+  const events = _calEvents.filter(e => parseInt(e.day) === day);
+  if (!birthdays.length && !events.length) return;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center';
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+
+  let html = `<div style="background:var(--paper);border-radius:20px 20px 0 0;width:100%;max-width:430px;padding:20px 16px 40px">
+    <div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:16px">${month}월 ${day}일</div>`;
+
+  events.forEach(e => {
+    html += `<div style="background:rgba(240,192,64,.1);border:1px solid rgba(240,192,64,.3);border-radius:12px;padding:12px 14px;margin-bottom:8px">
+      <div style="font-size:14px;font-weight:700;color:var(--ink)">📅 ${e.title}</div>
+      ${e.memo?`<div style="font-size:12px;color:var(--muted);margin-top:4px">${e.memo}</div>`:''}
+    </div>`;
+  });
+
+  birthdays.forEach(b => {
+    html += `<div style="background:rgba(233,30,140,.08);border:1px solid rgba(233,30,140,.2);border-radius:12px;padding:12px 14px;margin-bottom:8px">
+      <div style="font-size:14px;font-weight:700;color:#c2185b">🎂 ${b.name} L 생일</div>
+    </div>`;
+  });
+
+  if (isAdmin) {
+    html += `<button onclick="showAddEvent(${year},${month},${day},this)" style="width:100%;margin-top:8px;padding:12px;border:2px dashed var(--line);border-radius:12px;background:none;color:var(--muted);font-size:13px;font-weight:700;cursor:pointer">+ 일정 추가</button>`;
+  }
+
+  html += `</div>`;
+  overlay.innerHTML = html;
+  document.body.appendChild(overlay);
+}
+
+function showAddEvent(year, month, day, btn) {
+  const container = btn.closest('div[style*="border-radius:20px"]');
+  btn.remove();
+  const form = document.createElement('div');
+  form.innerHTML = `
+    <div style="margin-top:8px">
+      <input id="evt-title" placeholder="일정 제목" style="width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;background:var(--card);margin-bottom:8px">
+      <input id="evt-memo" placeholder="메모 (선택)" style="width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid var(--line);font-size:14px;box-sizing:border-box;background:var(--card);margin-bottom:8px">
+      <button onclick="saveCalEvent(${year},${month},${day})" class="btn-primary btn-gold">저장</button>
+    </div>`;
+  container.appendChild(form);
+}
+
+async function saveCalEvent(year, month, day) {
+  const title = document.getElementById('evt-title').value.trim();
+  if (!title) { showToast('제목을 입력해주세요'); return; }
+  const memo = document.getElementById('evt-memo').value.trim();
+  try {
+    await db.collection('events').add({
+      year, month, day, title, memo,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('일정이 등록됐습니다');
+    document.body.querySelector('div[style*="position:fixed"][style*="z-index:9999"]')?.remove();
+    loadCalEvents(_calYear, _calMonth);
+  } catch(e) {
+    showToast('저장 실패: ' + e.message);
+  }
+}
+
+async function loadCalEvents(year, month) {
+  try {
+    const snap = await db.collection('events')
+      .where('year','==',year).where('month','==',month).get();
+    _calEvents = snap.docs.map(d => ({...d.data(), id: d.id}));
+  } catch(e) {
+    _calEvents = [];
+  }
+  refreshCalendar();
+}
+
 function renderHome(el) {
   const userName = currentUser ? currentUser.name : '';
   el.innerHTML = `
@@ -1094,6 +1305,11 @@ function renderHome(el) {
       </div>
     </div>
 
+    <div class="section-label">클럽 일정 · 생일</div>
+    <div id="home-calendar" style="margin:0 16px 18px">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">달력 로딩 중...</div>
+    </div>
+
     <div class="section-label">최근 공지사항</div>
     <div id="home-notices" style="margin:0 16px 18px">
       ${NOTICES.slice(0,3).map(n=>`
@@ -1103,6 +1319,13 @@ function renderHome(el) {
       </div>`).join('')}
     </div>
   </div>`;
+
+  // 달력 초기 렌더링 (생일만 먼저)
+  const _initBirthdays = getBirthdays(_calYear, _calMonth);
+  const calEl = document.getElementById('home-calendar');
+  if (calEl) calEl.innerHTML = renderCalendar(_calYear, _calMonth, [], _initBirthdays);
+  // Firestore 일정 로드
+  loadCalEvents(_calYear, _calMonth);
 
   _unsubs['home_notices'] = db.collection('notices').orderBy('createdAt','desc').limit(3).onSnapshot(snap => {
     const el2 = document.getElementById('home-notices');
